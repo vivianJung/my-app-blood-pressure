@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>혈압 관리 대시보드</title>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #f4f7f6;
+      --card-bg: #ffffff;
+      --primary: #2c3e50;
+      --accent: #e74c3c;
+      --text: #333333;
+      --border: #e0e0e0;
+      
+      /* 기본 글꼴 크기 배율 (1 = 기본, 1.25 = 크게, 1.5 = 아주 크게) */
+      --font-scale: 1;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif; }
+    
+    /* font-scale 변수를 활용해 전체 요소의 크기 연동 */
+    body { 
+      background-color: var(--bg-color); 
+      color: var(--text); 
+      padding: 20px; 
+      font-size: calc(16px * var(--font-scale));
+      line-height: 1.6;
+    }
+    
+    .container { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    
+    /* 상단 컨트롤 바 (글자 크기 조절 헤더) */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 15px 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .font-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .font-control-label {
+      font-weight: bold;
+      font-size: calc(0.9rem * var(--font-scale));
+      color: var(--primary);
+    }
+
+    .btn-font-size {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 0.85rem;
+      transition: 0.2s;
+    }
+
+    .btn-font-size.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    
+    h1 { text-align: center; color: var(--primary); margin: 0; font-size: calc(1.8rem * var(--font-scale)); }
+    h3 { font-size: calc(1.17rem * var(--font-scale)); }
+    
+    .card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    
+    /* 입력 폼 */
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: calc(0.85rem * var(--font-scale)); font-weight: 600; color: #666; }
+    .form-group input { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: calc(0.95rem * var(--font-scale)); }
+    .btn-submit { 
+      background-color: var(--primary); 
+      color: #fff; 
+      border: none; 
+      padding: 11px 20px; 
+      border-radius: 6px; 
+      font-weight: bold; 
+      font-size: calc(0.95rem * var(--font-scale));
+      cursor: pointer; 
+      transition: 0.2s; 
+    }
+    .btn-submit:hover { background-color: #34495e; }
+
+    /* 필터 및 백업 버튼 영역 */
+    .filter-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .filter-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn-filter { 
+      padding: 6px 12px; 
+      border: 1px solid var(--border); 
+      background: #fff; 
+      border-radius: 20px; 
+      cursor: pointer; 
+      font-size: calc(0.85rem * var(--font-scale)); 
+    }
+    .btn-filter.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* 백업/복원 버튼 스타일 */
+    .btn-backup { padding: 7px 12px; border: 1px solid #27ae60; background: #27ae60; color: white; border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); font-weight: bold; cursor: pointer; }
+    .btn-backup:hover { background: #219150; }
+    .btn-restore { padding: 7px 12px; border: 1px solid #2980b9; background: #2980b9; color: white; border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); font-weight: bold; cursor: pointer; }
+    .btn-restore:hover { background: #1c5980; }
+
+    /* 차트 영역 */
+    .chart-container { position: relative; height: 380px; width: 100%; margin-top: 10px; }
+
+    /* 요약 표 스타일 */
+    .table-container { overflow-x: auto; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; text-align: center; font-size: calc(0.9rem * var(--font-scale)); }
+    th, td { padding: 12px 10px; border-bottom: 1px solid var(--border); }
+    th { background-color: #f8f9fa; color: #555; font-weight: 600; }
+    
+    /* 조건부 서식 태그 */
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: calc(0.8rem * var(--font-scale)); font-weight: bold; }
+    .badge-normal { background-color: #e8f5e9; color: #2e7d32; }
+    .badge-elevated { background-color: #fffde7; color: #f57f17; }
+    .badge-high1 { background-color: #fff3e0; color: #e65100; }
+    .badge-high2 { background-color: #ffebee; color: #c62828; }
+
+    /* 데이터 삭제 버튼 */
+    .btn-del-item { background-color: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: calc(0.8rem * var(--font-scale)); font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .btn-del-item:hover { background-color: #c0392b; }
+    .btn-delete-all { background: none; border: none; color: #999; cursor: pointer; font-size: calc(0.8rem * var(--font-scale)); text-decoration: underline; margin-left: 10px; }
+    .btn-delete-all:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 상단 헤더 및 폰트 크기 설정 영역 -->
+  <div class="top-bar">
+    <h1>🩸 혈압 기록 대시보드</h1>
+    <div class="font-control">
+      <span class="font-control-label">🔤 글자 크기:</span>
+      <button class="btn-font-size" id="btn-font-1" onclick="setFontScale(1)">보통</button>
+      <button class="btn-font-size" id="btn-font-1.25" onclick="setFontScale(1.25)">크게</button>
+      <button class="btn-font-size" id="btn-font-1.5" onclick="setFontScale(1.5)">아주 크게</button>
+    </div>
+  </div>
+
+  <!-- 데이터 입력 카드 -->
+  <div class="card">
+    <form id="bpForm" class="form-grid">
+      <div class="form-group">
+        <label>날짜</label>
+        <input type="date" id="inputDate" required>
+      </div>
+      <div class="form-group">
+        <label>시간</label>
+        <input type="time" id="inputTime" required>
+      </div>
+      <div class="form-group">
+        <label>수축기 (mmHg)</label>
+        <input type="number" id="inputSys" placeholder="120" min="50" max="250" required>
+      </div>
+      <div class="form-group">
+        <label>이완기 (mmHg)</label>
+        <input type="number" id="inputDia" placeholder="80" min="30" max="150" required>
+      </div>
+      <div class="form-group">
+        <label>맥박수 (bpm)</label>
+        <input type="number" id="inputPulse" placeholder="70" min="30" max="200" required>
+      </div>
+      <div class="form-group">
+        <label>특이사항 (이벤트)</label>
+        <input type="text" id="inputNote" placeholder="예: 약 복용, 운동 후">
+      </div>
+      <button type="submit" class="btn-submit">기록하기</button>
+    </form>
+  </div>
+
+  <!-- 차트 및 통계 분석 카드 -->
+  <div class="card">
+    <div class="filter-bar">
+      <h3>📈 혈압 추이 분석 (아침 vs 저녁)</h3>
+      <div class="filter-group">
+        <button class="btn-filter active" onclick="setFilter(7)">최근 7일</button>
+        <button class="btn-filter" onclick="setFilter(30)">최근 30일</button>
+        <button class="btn-filter" onclick="setFilter(90)">최근 90일</button>
+        <button class="btn-filter" onclick="setFilter(0)">전체</button>
+      </div>
+    </div>
+    <div class="chart-container">
+      <canvas id="bpChart"></canvas>
+    </div>
+  </div>
+
+  <!-- 기간별 요약 표 카드 -->
+  <div class="card">
+    <h3>📊 기간별 혈압 요약 통계</h3>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>구분 (시간대)</th>
+            <th>구분 측정 수</th>
+            <th>수축기 [평균 / 최댓값 / 최솟값]</th>
+            <th>이완기 [평균 / 최댓값 / 최솟값]</th>
+            <th>맥박 [평균 / 최댓값 / 최솟값]</th>
+            <th>혈압 상태 평가</th>
+          </tr>
+        </thead>
+        <tbody id="summaryTableBody">
+          <!-- 스크립트로 자동 생성 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 최근 측정 데이터 및 백업/복원 카드 -->
+  <div class="card">
+    <div class="filter-bar">
+      <h3>📋 최근 입력한 데이터 (최신 10건)</h3>
+      <div class="filter-group">
+        <button class="btn-backup" onclick="exportToCSV()">📥 CSV 백업</button>
+        <button class="btn-restore" onclick="document.getElementById('csvFileInput').click()">📤 CSV 불러오기</button>
+        <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="importFromCSV(event)">
+        <button class="btn-delete-all" onclick="clearAllData()">전체 삭제</button>
+      </div>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>날짜 및 시간</th>
+            <th>분류</th>
+            <th>수축기/이완기</th>
+            <th>맥박수</th>
+            <th>이벤트/메모</th>
+            <th>관리 (삭제)</th>
+          </tr>
+        </thead>
+        <tbody id="recentTableBody">
+          <!-- 스크립트로 자동 생성 -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 초기 데이터 및 설정 로드
+  let bpData = JSON.parse(localStorage.getItem('bpRecords')) || [];
+  let currentFontScale = parseFloat(localStorage.getItem('fontScale')) || 1.25; // 기본값 1.25(크게)
+  let currentDaysFilter = 7;
+  let chartInstance = null;
+
+  // 기본 날짜/시간 및 폰트 크기 세팅
+  document.addEventListener('DOMContentLoaded', () => {
+    const now = new Date();
+    document.getElementById('inputDate').value = now.toISOString().substring(0, 10);
+    document.getElementById('inputTime').value = now.toTimeString().substring(0, 5);
+    
+    // 저장된 폰트 크기 적용
+    setFontScale(currentFontScale);
+    renderApp();
+  });
+
+  // 폰트 크기 조절 함수
+  function setFontScale(scale) {
+    currentFontScale = scale;
+    document.documentElement.style.setProperty('--font-scale', scale);
+    localStorage.setItem('fontScale', scale);
+
+    // 버튼 활성화 상태 표시
+    document.querySelectorAll('.btn-font-size').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.getElementById(`btn-font-${scale}`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    // 차트 글자 크기 동기화를 위해 재렌더링
+    if (chartInstance) {
+      renderApp();
+    }
+  }
+
+  // 데이터 등록
+  document.getElementById('bpForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const date = document.getElementById('inputDate').value;
+    const time = document.getElementById('inputTime').value;
+    const sys = parseInt(document.getElementById('inputSys').value);
+    const dia = parseInt(document.getElementById('inputDia').value);
+    const pulse = parseInt(document.getElementById('inputPulse').value);
+    const note = document.getElementById('inputNote').value.trim();
+
+    const hour = parseInt(time.split(':')[0]);
+    const period = (hour >= 4 && hour < 12) ? '아침' : '저녁';
+
+    const record = { id: String(Date.now() + Math.random()), date, time, sys, dia, pulse, note, period };
+    
+    bpData.push(record);
+    sortData();
+    saveData();
+
+    document.getElementById('inputNote').value = '';
+    renderApp();
+  });
+
+  // 데이터 정렬
+  function sortData() {
+    bpData.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+  }
+
+  // 데이터 저장
+  function saveData() {
+    localStorage.setItem('bpRecords', JSON.stringify(bpData));
+  }
+
+  // 필터 변경
+  function setFilter(days) {
+    currentDaysFilter = days;
+    document.querySelectorAll('.btn-filter').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    renderApp();
+  }
+
+  // 필터링된 데이터 구하기
+  function getFilteredData() {
+    if (currentDaysFilter === 0) return bpData;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - currentDaysFilter);
+    return bpData.filter(d => new Date(d.date) >= cutoff);
+  }
+
+  // 이동 평균 계산 함수
+  function calculateSMA(data, windowSize) {
+    let result = [];
+    for (let i = 0; i < data.length; i++) {
+      if (i < windowSize - 1) {
+        result.push(null);
+      } else {
+        let sum = 0;
+        for (let j = 0; j < windowSize; j++) {
+          sum += data[i - j];
+        }
+        result.push((sum / windowSize).toFixed(1));
+      }
+    }
+    return result;
+  }
+
+  // 데이터 렌더링 총괄
+  function renderApp() {
+    const filteredData = getFilteredData();
+    renderChart(filteredData);
+    renderSummaryTable(filteredData);
+    renderRecentTable();
+  }
+
+  // 1. 그래프 그리기 (폰트 크기 가변 연동)
+  function renderChart(data) {
+    const ctx = document.getElementById('bpChart').getContext('2d');
+    if (chartInstance) chartInstance.destroy();
+
+    const labels = data.map(d => `${d.date.substring(5)} ${d.time} (${d.period})`);
+    const sysData = data.map(d => d.sys);
+    const diaData = data.map(d => d.dia);
+    const sysSMA = calculateSMA(sysData, 3);
+
+    const sysPointColors = data.map(d => d.period === '아침' ? '#ff9800' : '#3f51b5');
+
+    // 폰트 스케일에 따른 차트 폰트 크기 계산
+    const chartFontSize = 12 * currentFontScale;
+
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: '수축기 (mmHg)',
+            data: sysData,
+            borderColor: '#ef5350',
+            backgroundColor: sysPointColors,
+            pointRadius: 5 * currentFontScale,
+            pointHoverRadius: 8 * currentFontScale,
+            tension: 0.2
+          },
+          {
+            label: '수축기 3회 이동평균',
+            data: sysSMA,
+            borderColor: '#b71c1c',
+            borderDash: [5, 5],
+            pointRadius: 0,
+            fill: false,
+            tension: 0.4
+          },
+          {
+            label: '이완기 (mmHg)',
+            data: diaData,
+            borderColor: '#42a5f5',
+            backgroundColor: '#42a5f5',
+            pointRadius: 4 * currentFontScale,
+            tension: 0.2
+          },
+          {
+            label: '고혈압 기준 (140)',
+            data: new Array(data.length).fill(140),
+            borderColor: 'rgba(244, 67, 54, 0.4)',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: false
+          },
+          {
+            label: '정상 기준 (120)',
+            data: new Array(data.length).fill(120),
+            borderColor: 'rgba(76, 175, 80, 0.4)',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            labels: {
+              font: { size: chartFontSize, weight: 'bold' }
+            }
+          },
+          tooltip: {
+            bodyFont: { size: chartFontSize },
+            titleFont: { size: chartFontSize },
+            callbacks: {
+              afterBody: function(context) {
+                const index = context[0].dataIndex;
+                const note = data[index].note;
+                return note ? `📌 특이사항: ${note}` : '';
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { font: { size: chartFontSize } }
+          },
+          y: { 
+            min: 40, 
+            max: 200, 
+            title: { display: true, text: '혈압 (mmHg)', font: { size: chartFontSize, weight: 'bold' } },
+            ticks: { font: { size: chartFontSize } }
+          }
+        }
+      }
+    });
+  }
+
+  // 2. 요약 표 출력
+  function renderSummaryTable(data) {
+    const tbody = document.getElementById('summaryTableBody');
+    tbody.innerHTML = '';
+
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6">해당 기간의 측정 데이터가 없습니다.</td></tr>`;
+      return;
+    }
+
+    const periods = ['전체', '아침', '저녁'];
+    
+    periods.forEach(p => {
+      const pData = p === '전체' ? data : data.filter(d => d.period === p);
+      if (pData.length === 0) return;
+
+      const sysArr = pData.map(d => d.sys);
+      const diaArr = pData.map(d => d.dia);
+      const pulseArr = pData.map(d => d.pulse);
+
+      const sysAvg = (sysArr.reduce((a,b)=>a+b, 0) / sysArr.length).toFixed(1);
+      const sysMax = Math.max(...sysArr);
+      const sysMin = Math.min(...sysArr);
+
+      const diaAvg = (diaArr.reduce((a,b)=>a+b, 0) / diaArr.length).toFixed(1);
+      const diaMax = Math.max(...diaArr);
+      const diaMin = Math.min(...diaArr);
+
+      const pulseAvg = (pulseArr.reduce((a,b)=>a+b, 0) / pulseArr.length).toFixed(1);
+      const pulseMax = Math.max(...pulseArr);
+      const pulseMin = Math.min(...pulseArr);
+
+      const badge = getStatusBadge(sysAvg, diaAvg);
+
+      const row = `
+        <tr>
+          <td><strong>${p}</strong></td>
+          <td>${pData.length} 회</td>
+          <td><strong>${sysAvg}</strong> / <span style="color:red">${sysMax}</span> / <span style="color:blue">${sysMin}</span></td>
+          <td><strong>${diaAvg}</strong> / <span style="color:red">${diaMax}</span> / <span style="color:blue">${diaMin}</span></td>
+          <td><strong>${pulseAvg}</strong> / ${pulseMax} / ${pulseMin}</td>
+          <td>${badge}</td>
+        </tr>
+      `;
+      tbody.innerHTML += row;
+    });
+  }
+
+  function getStatusBadge(sys, dia) {
+    if (sys < 120 && dia < 80) {
+      return `<span class="badge badge-normal">정상</span>`;
+    } else if (sys <= 129 && dia < 80) {
+      return `<span class="badge badge-elevated">주의 혈압</span>`;
+    } else if (sys <= 139 || dia <= 89) {
+      return `<span class="badge badge-high1">고혈압 1단계</span>`;
+    } else {
+      return `<span class="badge badge-high2">고혈압 2단계</span>`;
+    }
+  }
+
+  // 3. 최근 입력 데이터 목록
+  function renderRecentTable() {
+    const tbody = document.getElementById('recentTableBody');
+    tbody.innerHTML = '';
+
+    const recentData = [...bpData].reverse().slice(0, 10);
+
+    if (recentData.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6">기록된 데이터가 없습니다.</td></tr>`;
+      return;
+    }
+
+    recentData.forEach(d => {
+      const row = `
+        <tr>
+          <td>${d.date} ${d.time}</td>
+          <td>${d.period}</td>
+          <td><strong>${d.sys} / ${d.dia}</strong> mmHg</td>
+          <td>${d.pulse} bpm</td>
+          <td>${d.note ? `<span style="color:#d32f2f">📌 ${d.note}</span>` : '-'}</td>
+          <td><button class="btn-del-item" onclick="deleteRecord('${d.id}')">삭제</button></td>
+        </tr>
+      `;
+      tbody.innerHTML += row;
+    });
+  }
+
+  // 항목 개별 삭제 함수
+  function deleteRecord(id) {
+    if (confirm('이 혈압 기록을 삭제하시겠습니까?')) {
+      bpData = bpData.filter(d => String(d.id) !== String(id));
+      saveData();
+      renderApp();
+    }
+  }
+
+  // 전체 데이터 삭제
+  function clearAllData() {
+    if (confirm('모든 혈압 기록이 삭제됩니다. 정말 초기화하시겠습니까?')) {
+      bpData = [];
+      localStorage.removeItem('bpRecords');
+      renderApp();
+    }
+  }
+
+  // CSV 백업 내보내기 & 불러오기
+  function exportToCSV() {
+    if (bpData.length === 0) {
+      alert('백업할 데이터가 없습니다.');
+      return;
+    }
+
+    let csvContent = '\uFEFF날짜,시간,분류,수축기,이완기,맥박수,특이사항\n';
+
+    bpData.forEach(d => {
+      const noteStr = d.note ? `"${d.note.replace(/"/g, '""')}"` : '';
+      csvContent += `${d.date},${d.time},${d.period},${d.sys},${d.dia},${d.pulse},${noteStr}\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    const todayStr = new Date().toISOString().substring(0, 10).replace(/-/g, '');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `혈압기록_백업_${todayStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function importFromCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const content = e.target.result;
+      const lines = content.split(/\r\n|\n/);
+      
+      let importedCount = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const cols = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
+        
+        if (cols.length >= 6) {
+          const date = cols[0].replace(/"/g, '').trim();
+          const time = cols[1].replace(/"/g, '').trim();
+          const sys = parseInt(cols[3].replace(/"/g, '').trim());
+          const dia = parseInt(cols[4].replace(/"/g, '').trim());
+          const pulse = parseInt(cols[5].replace(/"/g, '').trim());
+          const note = cols[6] ? cols[6].replace(/^"|"$/g, '').replace(/""/g, '"').trim() : '';
+
+          const hour = parseInt(time.split(':')[0]);
+          const period = (hour >= 4 && hour < 12) ? '아침' : '저녁';
+
+          const isDuplicate = bpData.some(d => d.date === date && d.time === time);
+
+          if (!isDuplicate && !isNaN(sys) && !isNaN(dia)) {
+            bpData.push({
+              id: String(Date.now() + Math.random()),
+              date, time, sys, dia, pulse, note, period
+            });
+            importedCount++;
+          }
+        }
+      }
+
+      if (importedCount > 0) {
+        sortData();
+        saveData();
+        renderApp();
+        alert(`${importedCount}건의 새로운 혈압 기록을 불러왔습니다!`);
+      } else {
+        alert('새로 추가할 데이터가 없거나 올바르지 않은 CSV 형식입니다.');
+      }
+
+      event.target.value = '';
+    };
+
+    reader.readAsText(file, 'UTF-8');
+  }
+</script>
+
+</body>
+</html>
