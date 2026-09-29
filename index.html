@@ -561,12 +561,18 @@
 
   // 전체 데이터 삭제
   function clearAllData() {
-    if (confirm('모든 혈압 기록이 삭제됩니다. 정말 초기화하시겠습니까?')) {
-      bpData = [];
-      localStorage.removeItem('bpRecords');
-      renderApp();
+    // 1차 재확인 팝업
+    const confirmed = confirm('⚠️ 주의: 정말로 모든 데이터를 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.');
+    
+    if (confirmed) {
+        localStorage.removeItem('bpData'); // 사용하는 데이터 키 이름으로 지정
+        renderData(); // 화면 갱신 함수 호출
+        alert('모든 데이터가 삭제되었습니다.');
+    } else {
+        // 취소를 누르면 아무 작업도 하지 않음
+        return;
     }
-  }
+}
 
   // CSV 백업 내보내기 & 불러오기
   function exportToCSV() {
