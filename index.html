@@ -72,6 +72,22 @@
       color: #fff;
       border-color: var(--primary);
     }
+
+    /* 백업 알림 배너 */
+    .backup-alert-banner {
+      display: none;
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeeba;
+      padding: 15px 20px;
+      border-radius: 12px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-weight: bold;
+      font-size: calc(0.95rem * var(--font-scale));
+    }
     
     h1 { text-align: center; color: var(--primary); margin: 0; font-size: calc(1.8rem * var(--font-scale)); }
     h3 { font-size: calc(1.17rem * var(--font-scale)); }
@@ -109,9 +125,15 @@
     }
     .btn-filter.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-    /* 백업/복원 버튼 스타일 */
+    /* 백업/복원 버튼 및 이메일 설정 */
+    .email-config-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
+    .email-config-group input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); flex: 1; min-width: 200px; }
+    .btn-email-save { padding: 7px 12px; border: 1px solid var(--primary); background: var(--primary); color: white; border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); cursor: pointer; }
+    
     .btn-backup { padding: 7px 12px; border: 1px solid #27ae60; background: #27ae60; color: white; border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); font-weight: bold; cursor: pointer; }
     .btn-backup:hover { background: #219150; }
+    .btn-email-send { padding: 7px 12px; border: 1px solid #8e44ad; background: #8e44ad; color: white; border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); font-weight: bold; cursor: pointer; }
+    .btn-email-send:hover { background: #732d91; }
     .btn-restore { padding: 7px 12px; border: 1px solid #2980b9; background: #2980b9; color: white; border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); font-weight: bold; cursor: pointer; }
     .btn-restore:hover { background: #1c5980; }
 
@@ -150,6 +172,12 @@
       <button class="btn-font-size" id="btn-font-1.25" onclick="setFontScale(1.25)">크게</button>
       <button class="btn-font-size" id="btn-font-1.5" onclick="setFontScale(1.5)">아주 크게</button>
     </div>
+  </div>
+
+  <!-- 주간 백업 자동 알림 배너 -->
+  <div id="backupAlertBanner" class="backup-alert-banner">
+    <span>📅 주간 데이터 백업 주기(7일)가 되었습니다! 이메일로 백업 파일을 백업해 두세요.</span>
+    <button class="btn-email-send" onclick="sendEmailBackup()">📧 지금 이메일 백업하기</button>
   </div>
 
   <!-- 데이터 입력 카드 -->
@@ -223,10 +251,17 @@
 
   <!-- 최근 측정 데이터 및 백업/복원 카드 -->
   <div class="card">
+    <div class="email-config-group">
+      <label style="font-weight: bold; font-size: calc(0.85rem * var(--font-scale));">📧 백업 수신 이메일:</label>
+      <input type="email" id="userEmailInput" placeholder="example@email.com">
+      <button class="btn-email-save" onclick="saveUserEmail()">이메일 저장</button>
+    </div>
+
     <div class="filter-bar">
       <h3>📋 최근 입력한 데이터 (최신 10건)</h3>
       <div class="filter-group">
-        <button class="btn-backup" onclick="exportToCSV()">📥 CSV 백업</button>
+        <button class="btn-backup" onclick="exportToCSV()">📥 CSV 다운로드</button>
+        <button class="btn-email-send" onclick="sendEmailBackup()">📧 이메일로 백업 전송</button>
         <button class="btn-restore" onclick="document.getElementById('csvFileInput').click()">📤 CSV 불러오기</button>
         <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="importFromCSV(event)">
         <button class="btn-delete-all" onclick="clearAllData()">전체 삭제</button>
@@ -256,6 +291,8 @@
   // 초기 데이터 및 설정 로드
   let bpData = JSON.parse(localStorage.getItem('bpRecords')) || [];
   let currentFontScale = parseFloat(localStorage.getItem('fontScale')) || 1.25;
+  let userEmail = localStorage.getItem('userEmail') || '';
+  let lastBackupDate = localStorage.getItem('lastBackupDate') || '';
   let currentDaysFilter = 7;
   let chartInstance = null;
 
@@ -265,9 +302,44 @@
     document.getElementById('inputDate').value = now.toISOString().substring(0, 10);
     document.getElementById('inputTime').value = now.toTimeString().substring(0, 5);
     
+    if (userEmail) {
+      document.getElementById('userEmailInput').value = userEmail;
+    }
+
     setFontScale(currentFontScale);
+    checkBackupReminder();
     renderApp();
   });
+
+  // 이메일 주소 저장
+  function saveUserEmail() {
+    const email = document.getElementById('userEmailInput').value.trim();
+    if (!email || !email.includes('@')) {
+      alert('올바른 이메일 주소를 입력해 주세요.');
+      return;
+    }
+    userEmail = email;
+    localStorage.setItem('userEmail', email);
+    alert('백업 수신 이메일 주소가 저장되었습니다!');
+  }
+
+  // 백업 알림 주기(7일) 체크
+  function checkBackupReminder() {
+    if (!lastBackupDate) {
+      // 첫 방문/백업 기록이 없으면 알림 띄우지 않음 (첫 백업 시점부터 기록)
+      return;
+    }
+
+    const last = new Date(lastBackupDate);
+    const today = new Date();
+    const diffDays = Math.floor((today - last) / (1000 * 60 * 60 * 24));
+
+    if (diffDays >= 7) {
+      document.getElementById('backupAlertBanner').style.display = 'flex';
+    } else {
+      document.getElementById('backupAlertBanner').style.display = 'none';
+    }
+  }
 
   // 폰트 크기 조절 함수
   function setFontScale(scale) {
@@ -555,23 +627,23 @@
     }
   }
 
-  // 전체 데이터 삭제 (수정 완료!)
+  // 전체 데이터 삭제
   function clearAllData() {
     const confirmed = confirm('⚠️ 주의: 정말로 모든 데이터를 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.');
     
     if (confirmed) {
-      localStorage.removeItem('bpRecords'); // 올바른 데이터 키 이름 적용!
-      bpData = []; // 메모리 내 데이터도 빈 배열로 초기화
-      renderApp(); // 올바른 화면 갱신 함수 호출!
+      localStorage.removeItem('bpRecords');
+      bpData = [];
+      renderApp();
       alert('모든 데이터가 삭제되었습니다.');
     }
   }
 
-  // CSV 백업 내보내기 & 불러오기
+  // CSV 내보내기 공통 로직
   function exportToCSV() {
     if (bpData.length === 0) {
       alert('백업할 데이터가 없습니다.');
-      return;
+      return false;
     }
 
     let csvContent = '\uFEFF날짜,시간,분류,수축기,이완기,맥박수,특이사항\n';
@@ -591,8 +663,42 @@
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    // 마지막 백업 날짜 저장 및 알림창 숨기기
+    const nowISO = new Date().toISOString();
+    localStorage.setItem('lastBackupDate', nowISO);
+    lastBackupDate = nowISO;
+    document.getElementById('backupAlertBanner').style.display = 'none';
+
+    return true;
   }
 
+  // 이메일 백업 발송 (원클릭 백업 다운로드 + 메일 전송 창 열기)
+  function sendEmailBackup() {
+    const emailInput = document.getElementById('userEmailInput').value.trim();
+    if (emailInput) {
+      userEmail = emailInput;
+      localStorage.setItem('userEmail', emailInput);
+    }
+
+    if (!userEmail) {
+      alert('먼저 백업을 받으실 이메일 주소를 입력해 주세요.');
+      document.getElementById('userEmailInput').focus();
+      return;
+    }
+
+    const downloaded = exportToCSV();
+    if (!downloaded) return;
+
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const subject = encodeURIComponent(`[혈압 대시보드] 주간 데이터 백업 파일 (${todayStr})`);
+    const body = encodeURIComponent(`안녕하세요.\n\n혈압 기록 대시보드 주간 백업 데이터 파일입니다.\n다운로드된 CSV 파일을 이 메일에 첨부하여 보관해 주세요!\n\n발송일: ${todayStr}`);
+
+    // 메일 앱 호출
+    window.location.href = `mailto:${userEmail}?subject=${subject}&body=${body}`;
+  }
+
+  // CSV 파일 읽어오기 (복원)
   function importFromCSV(event) {
     const file = event.target.files[0];
     if (!file) return;
