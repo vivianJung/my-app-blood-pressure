@@ -1,303 +1,48 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>혈압 관리 대시보드</title>
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    :root {
-      --bg-color: #f4f7f6;
-      --card-bg: #ffffff;
-      --primary: #2c3e50;
-      --accent: #e74c3c;
-      --text: #333333;
-      --border: #e0e0e0;
-      
-      /* 기본 글꼴 크기 배율 */
-      --font-scale: 1;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif; }
-    
-    body { 
-      background-color: var(--bg-color); 
-      color: var(--text); 
-      padding: 20px; 
-      font-size: calc(16px * var(--font-scale));
-      line-height: 1.6;
-    }
-    
-    .container { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-    
-    /* 상단 컨트롤 바 */
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--card-bg);
-      padding: 15px 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .font-control {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .font-control-label {
-      font-weight: bold;
-      font-size: calc(0.9rem * var(--font-scale));
-      color: var(--primary);
-    }
-
-    .btn-font-size {
-      padding: 6px 12px;
-      border: 1px solid var(--border);
-      background: #fff;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: bold;
-      font-size: 0.85rem;
-      transition: 0.2s;
-    }
-
-    .btn-font-size.active {
-      background: var(--primary);
-      color: #fff;
-      border-color: var(--primary);
-    }
-
-    /* 백업 알림 배너 */
-    .backup-alert-banner {
-      display: none;
-      background-color: #fff3cd;
-      color: #856404;
-      border: 1px solid #ffeeba;
-      padding: 15px 20px;
-      border-radius: 12px;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 10px;
-      font-weight: bold;
-      font-size: calc(0.95rem * var(--font-scale));
-    }
-    
-    h1 { text-align: center; color: var(--primary); margin: 0; font-size: calc(1.8rem * var(--font-scale)); }
-    h3 { font-size: calc(1.17rem * var(--font-scale)); }
-    
-    .card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-    
-    /* 입력 폼 */
-    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; align-items: end; }
-    .form-group { display: flex; flex-direction: column; gap: 5px; }
-    .form-group label { font-size: calc(0.85rem * var(--font-scale)); font-weight: 600; color: #666; }
-    .form-group input { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: calc(0.95rem * var(--font-scale)); }
-    .btn-submit { 
-      background-color: var(--primary); 
-      color: #fff; 
-      border: none; 
-      padding: 11px 20px; 
-      border-radius: 6px; 
-      font-weight: bold; 
-      font-size: calc(0.95rem * var(--font-scale));
-      cursor: pointer; 
-      transition: 0.2s; 
-    }
-    .btn-submit:hover { background-color: #34495e; }
-
-    /* 필터 및 백업 버튼 영역 */
-    .filter-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-    .filter-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .btn-filter { 
-      padding: 6px 12px; 
-      border: 1px solid var(--border); 
-      background: #fff; 
-      border-radius: 20px; 
-      cursor: pointer; 
-      font-size: calc(0.85rem * var(--font-scale)); 
-    }
-    .btn-filter.active { background: var(--primary); color: #fff; border-color: var(--primary); }
-
-    /* 백업/복원 버튼 및 이메일 설정 */
-    .email-config-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; width: 100%; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
-    .email-config-group input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); flex: 1; min-width: 200px; }
-    .btn-email-save { padding: 7px 12px; border: 1px solid var(--primary); background: var(--primary); color: white; border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); cursor: pointer; }
-    
-    .btn-backup { padding: 7px 12px; border: 1px solid #27ae60; background: #27ae60; color: white; border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); font-weight: bold; cursor: pointer; }
-    .btn-backup:hover { background: #219150; }
-    .btn-email-send { padding: 7px 12px; border: 1px solid #8e44ad; background: #8e44ad; color: white; border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); font-weight: bold; cursor: pointer; }
-    .btn-email-send:hover { background: #732d91; }
-    .btn-restore { padding: 7px 12px; border: 1px solid #2980b9; background: #2980b9; color: white; border-radius: 6px; font-size: calc(0.85rem * var(--font-scale)); font-weight: bold; cursor: pointer; }
-    .btn-restore:hover { background: #1c5980; }
-
-    /* 차트 영역 */
-    .chart-container { position: relative; height: 380px; width: 100%; margin-top: 10px; }
-
-    /* 요약 표 스타일 */
-    .table-container { overflow-x: auto; margin-top: 10px; }
-    table { width: 100%; border-collapse: collapse; text-align: center; font-size: calc(0.9rem * var(--font-scale)); }
-    th, td { padding: 12px 10px; border-bottom: 1px solid var(--border); }
-    th { background-color: #f8f9fa; color: #555; font-weight: 600; }
-    
-    /* 조건부 서식 태그 */
-    .badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: calc(0.8rem * var(--font-scale)); font-weight: bold; }
-    .badge-normal { background-color: #e8f5e9; color: #2e7d32; }
-    .badge-elevated { background-color: #fffde7; color: #f57f17; }
-    .badge-high1 { background-color: #fff3e0; color: #e65100; }
-    .badge-high2 { background-color: #ffebee; color: #c62828; }
-
-    /* 데이터 삭제 버튼 */
-    .btn-del-item { background-color: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: calc(0.8rem * var(--font-scale)); font-weight: bold; cursor: pointer; transition: 0.2s; }
-    .btn-del-item:hover { background-color: #c0392b; }
-    .btn-delete-all { background: none; border: none; color: #999; cursor: pointer; font-size: calc(0.8rem * var(--font-scale)); text-decoration: underline; margin-left: 10px; }
-    .btn-delete-all:hover { color: var(--accent); }
-  </style>
-</head>
-<body>
-
-<div class="container">
-  <!-- 상단 헤더 및 폰트 크기 설정 영역 -->
-  <div class="top-bar">
-    <h1>🩸 혈압 기록 대시보드</h1>
-    <div class="font-control">
-      <span class="font-control-label">🔤 글자 크기:</span>
-      <button class="btn-font-size" id="btn-font-1" onclick="setFontScale(1)">보통</button>
-      <button class="btn-font-size" id="btn-font-1.25" onclick="setFontScale(1.25)">크게</button>
-      <button class="btn-font-size" id="btn-font-1.5" onclick="setFontScale(1.5)">아주 크게</button>
-    </div>
-  </div>
-
-  <!-- 주간 백업 자동 알림 배너 -->
-  <div id="backupAlertBanner" class="backup-alert-banner">
-    <span>📅 주간 데이터 백업 주기(7일)가 되었습니다! 이메일로 백업 파일을 백업해 두세요.</span>
-    <button class="btn-email-send" onclick="sendEmailBackup()">📧 지금 이메일 백업하기</button>
-  </div>
-
-  <!-- 데이터 입력 카드 -->
-  <div class="card">
-    <form id="bpForm" class="form-grid">
-      <div class="form-group">
-        <label>날짜</label>
-        <input type="date" id="inputDate" required>
-      </div>
-      <div class="form-group">
-        <label>시간</label>
-        <input type="time" id="inputTime" required>
-      </div>
-      <div class="form-group">
-        <label>수축기 (mmHg)</label>
-        <input type="number" id="inputSys" placeholder="120" min="50" max="250" required>
-      </div>
-      <div class="form-group">
-        <label>이완기 (mmHg)</label>
-        <input type="number" id="inputDia" placeholder="80" min="30" max="150" required>
-      </div>
-      <div class="form-group">
-        <label>맥박수 (bpm)</label>
-        <input type="number" id="inputPulse" placeholder="70" min="30" max="200" required>
-      </div>
-      <div class="form-group">
-        <label>특이사항 (이벤트)</label>
-        <input type="text" id="inputNote" placeholder="예: 약 복용, 운동 후">
-      </div>
-      <button type="submit" class="btn-submit">기록하기</button>
-    </form>
-  </div>
-
-  <!-- 차트 및 통계 분석 카드 -->
-  <div class="card">
-    <div class="filter-bar">
-      <h3>📈 혈압 추이 분석 (아침 vs 저녁)</h3>
-      <div class="filter-group">
-        <button class="btn-filter active" onclick="setFilter(7)">최근 7일</button>
-        <button class="btn-filter" onclick="setFilter(30)">최근 30일</button>
-        <button class="btn-filter" onclick="setFilter(90)">최근 90일</button>
-        <button class="btn-filter" onclick="setFilter(0)">전체</button>
-      </div>
-    </div>
-    <div class="chart-container">
-      <canvas id="bpChart"></canvas>
-    </div>
-  </div>
-
-  <!-- 기간별 요약 표 카드 -->
-  <div class="card">
-    <h3>📊 기간별 혈압 요약 통계</h3>
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>구분 (시간대)</th>
-            <th>구분 측정 수</th>
-            <th>수축기 [평균 / 최댓값 / 최솟값]</th>
-            <th>이완기 [평균 / 최댓값 / 최솟값]</th>
-            <th>맥박 [평균 / 최댓값 / 최솟값]</th>
-            <th>혈압 상태 평가</th>
-          </tr>
-        </thead>
-        <tbody id="summaryTableBody">
-          <!-- 스크립트로 자동 생성 -->
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- 최근 측정 데이터 및 백업/복원 카드 -->
-  <div class="card">
-    <div class="email-config-group">
-      <label style="font-weight: bold; font-size: calc(0.85rem * var(--font-scale));">📧 백업 수신 이메일:</label>
-      <input type="email" id="userEmailInput" placeholder="example@email.com">
-      <button class="btn-email-save" onclick="saveUserEmail()">이메일 저장</button>
-    </div>
-
-    <div class="filter-bar">
-      <h3>📋 최근 입력한 데이터 (최신 10건)</h3>
-      <div class="filter-group">
-        <button class="btn-backup" onclick="exportToCSV()">📥 CSV 다운로드</button>
-        <button class="btn-email-send" onclick="sendEmailBackup()">📧 이메일로 백업 전송</button>
-        <button class="btn-restore" onclick="document.getElementById('csvFileInput').click()">📤 CSV 불러오기</button>
-        <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="importFromCSV(event)">
-        <button class="btn-delete-all" onclick="clearAllData()">전체 삭제</button>
-      </div>
-    </div>
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>날짜 및 시간</th>
-            <th>분류</th>
-            <th>수축기/이완기</th>
-            <th>맥박수</th>
-            <th>이벤트/메모</th>
-            <th>관리 (삭제)</th>
-          </tr>
-        </thead>
-        <tbody id="recentTableBody">
-          <!-- 스크립트로 자동 생성 -->
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
 <script>
-  // 초기 데이터 및 설정 로드
-  let bpData = JSON.parse(localStorage.getItem('bpRecords')) || [];
-  let currentFontScale = parseFloat(localStorage.getItem('fontScale')) || 1.25;
-  let userEmail = localStorage.getItem('userEmail') || '';
-  let lastBackupDate = localStorage.getItem('lastBackupDate') || '';
+  // Safe Storage Handling (데이터 예외 처리 강화)
+  let bpData = [];
+  let currentFontScale = 1.25;
+  let userEmail = '';
+  let lastBackupDate = '';
   let currentDaysFilter = 7;
   let chartInstance = null;
 
-  // 기본 날짜/시간 및 폰트 크기 세팅
+  // 안전하게 localStorage 읽기
+  function loadInitialData() {
+    try {
+      const savedData = localStorage.getItem('bpRecords');
+      if (savedData) {
+        bpData = JSON.parse(savedData);
+        if (!Array.isArray(bpData)) bpData = [];
+      }
+    } catch (e) {
+      console.error('데이터 읽기 오류:', e);
+      bpData = [];
+    }
+
+    try {
+      currentFontScale = parseFloat(localStorage.getItem('fontScale')) || 1.25;
+      userEmail = localStorage.getItem('userEmail') || '';
+      lastBackupDate = localStorage.getItem('lastBackupDate') || '';
+    } catch (e) {
+      console.error('설정값 읽기 오류:', e);
+    }
+  }
+
+  // 안전하게 localStorage 저장하기
+  function saveData() {
+    try {
+      localStorage.setItem('bpRecords', JSON.stringify(bpData));
+    } catch (e) {
+      alert('⚠️ 브라우저 저장 용량이 부족하거나 보안 설정 때문에 데이터를 저장하지 못했습니다.');
+      console.error('데이터 저장 오류:', e);
+    }
+  }
+
+  // 초기화 시 실행
   document.addEventListener('DOMContentLoaded', () => {
+    loadInitialData();
+
     const now = new Date();
     document.getElementById('inputDate').value = now.toISOString().substring(0, 10);
     document.getElementById('inputTime').value = now.toTimeString().substring(0, 5);
@@ -319,16 +64,17 @@
       return;
     }
     userEmail = email;
-    localStorage.setItem('userEmail', email);
-    alert('백업 수신 이메일 주소가 저장되었습니다!');
+    try {
+      localStorage.setItem('userEmail', email);
+      alert('백업 수신 이메일 주소가 저장되었습니다!');
+    } catch (e) {
+      alert('이메일 저장 실패: 브라우저 저장소 설정을 확인하세요.');
+    }
   }
 
   // 백업 알림 주기(7일) 체크
   function checkBackupReminder() {
-    if (!lastBackupDate) {
-      // 첫 방문/백업 기록이 없으면 알림 띄우지 않음 (첫 백업 시점부터 기록)
-      return;
-    }
+    if (!lastBackupDate) return;
 
     const last = new Date(lastBackupDate);
     const today = new Date();
@@ -341,19 +87,19 @@
     }
   }
 
-  // 폰트 크기 조절 함수
+  // 폰트 크기 조절
   function setFontScale(scale) {
     currentFontScale = scale;
     document.documentElement.style.setProperty('--font-scale', scale);
-    localStorage.setItem('fontScale', scale);
+    try {
+      localStorage.setItem('fontScale', scale);
+    } catch (e) {}
 
     document.querySelectorAll('.btn-font-size').forEach(btn => btn.classList.remove('active'));
     const activeBtn = document.getElementById(`btn-font-${scale}`);
     if (activeBtn) activeBtn.classList.add('active');
 
-    if (chartInstance) {
-      renderApp();
-    }
+    if (chartInstance) renderApp();
   }
 
   // 데이터 등록
@@ -385,17 +131,12 @@
     bpData.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
   }
 
-  // 데이터 저장
-  function saveData() {
-    localStorage.setItem('bpRecords', JSON.stringify(bpData));
-  }
-
   // 필터 변경
-  function setFilter(days) {
+  function setFilter(days, btnElement) {
     currentDaysFilter = days;
     document.querySelectorAll('.btn-filter').forEach(btn => btn.classList.remove('active'));
-    if (event && event.target) {
-      event.target.classList.add('active');
+    if (btnElement) {
+      btnElement.classList.add('active');
     }
     renderApp();
   }
@@ -408,7 +149,7 @@
     return bpData.filter(d => new Date(d.date) >= cutoff);
   }
 
-  // 이동 평균 계산 함수
+  // 이동 평균 계산
   function calculateSMA(data, windowSize) {
     let result = [];
     for (let i = 0; i < data.length; i++) {
@@ -425,7 +166,7 @@
     return result;
   }
 
-  // 데이터 렌더링 총괄
+  // 렌더링 총괄
   function renderApp() {
     const filteredData = getFilteredData();
     renderChart(filteredData);
@@ -433,7 +174,7 @@
     renderRecentTable();
   }
 
-  // 1. 그래프 그리기
+  // 차트 렌더링
   function renderChart(data) {
     const ctx = document.getElementById('bpChart').getContext('2d');
     if (chartInstance) chartInstance.destroy();
@@ -499,11 +240,7 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            labels: {
-              font: { size: chartFontSize, weight: 'bold' }
-            }
-          },
+          legend: { labels: { font: { size: chartFontSize, weight: 'bold' } } },
           tooltip: {
             bodyFont: { size: chartFontSize },
             titleFont: { size: chartFontSize },
@@ -517,9 +254,7 @@
           }
         },
         scales: {
-          x: {
-            ticks: { font: { size: chartFontSize } }
-          },
+          x: { ticks: { font: { size: chartFontSize } } },
           y: { 
             min: 40, 
             max: 200, 
@@ -531,7 +266,7 @@
     });
   }
 
-  // 2. 요약 표 출력
+  // 요약 표 렌더링
   function renderSummaryTable(data) {
     const tbody = document.getElementById('summaryTableBody');
     tbody.innerHTML = '';
@@ -580,18 +315,13 @@
   }
 
   function getStatusBadge(sys, dia) {
-    if (sys < 120 && dia < 80) {
-      return `<span class="badge badge-normal">정상</span>`;
-    } else if (sys <= 129 && dia < 80) {
-      return `<span class="badge badge-elevated">주의 혈압</span>`;
-    } else if (sys <= 139 || dia <= 89) {
-      return `<span class="badge badge-high1">고혈압 1단계</span>`;
-    } else {
-      return `<span class="badge badge-high2">고혈압 2단계</span>`;
-    }
+    if (sys < 120 && dia < 80) return `<span class="badge badge-normal">정상</span>`;
+    if (sys <= 129 && dia < 80) return `<span class="badge badge-elevated">주의 혈압</span>`;
+    if (sys <= 139 || dia <= 89) return `<span class="badge badge-high1">고혈압 1단계</span>`;
+    return `<span class="badge badge-high2">고혈압 2단계</span>`;
   }
 
-  // 3. 최근 입력 데이터 목록
+  // 최근 데이터 표 렌더링
   function renderRecentTable() {
     const tbody = document.getElementById('recentTableBody');
     tbody.innerHTML = '';
@@ -618,7 +348,7 @@
     });
   }
 
-  // 항목 개별 삭제
+  // 삭제 함수
   function deleteRecord(id) {
     if (confirm('이 혈압 기록을 삭제하시겠습니까?')) {
       bpData = bpData.filter(d => String(d.id) !== String(id));
@@ -627,19 +357,18 @@
     }
   }
 
-  // 전체 데이터 삭제
   function clearAllData() {
-    const confirmed = confirm('⚠️ 주의: 정말로 모든 데이터를 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.');
-    
-    if (confirmed) {
-      localStorage.removeItem('bpRecords');
+    if (confirm('⚠️ 주의: 정말로 모든 데이터를 삭제하시겠습니까?')) {
+      try {
+        localStorage.removeItem('bpRecords');
+      } catch (e) {}
       bpData = [];
       renderApp();
       alert('모든 데이터가 삭제되었습니다.');
     }
   }
 
-  // CSV 내보내기 공통 로직
+  // CSV 내보내기
   function exportToCSV() {
     if (bpData.length === 0) {
       alert('백업할 데이터가 없습니다.');
@@ -647,7 +376,6 @@
     }
 
     let csvContent = '\uFEFF날짜,시간,분류,수축기,이완기,맥박수,특이사항\n';
-
     bpData.forEach(d => {
       const noteStr = d.note ? `"${d.note.replace(/"/g, '""')}"` : '';
       csvContent += `${d.date},${d.time},${d.period},${d.sys},${d.dia},${d.pulse},${noteStr}\n`;
@@ -664,21 +392,24 @@
     link.click();
     document.body.removeChild(link);
 
-    // 마지막 백업 날짜 저장 및 알림창 숨기기
     const nowISO = new Date().toISOString();
-    localStorage.setItem('lastBackupDate', nowISO);
+    try {
+      localStorage.setItem('lastBackupDate', nowISO);
+    } catch (e) {}
     lastBackupDate = nowISO;
     document.getElementById('backupAlertBanner').style.display = 'none';
 
     return true;
   }
 
-  // 이메일 백업 발송 (원클릭 백업 다운로드 + 메일 전송 창 열기)
+  // 이메일 백업
   function sendEmailBackup() {
     const emailInput = document.getElementById('userEmailInput').value.trim();
     if (emailInput) {
       userEmail = emailInput;
-      localStorage.setItem('userEmail', emailInput);
+      try {
+        localStorage.setItem('userEmail', emailInput);
+      } catch (e) {}
     }
 
     if (!userEmail) {
@@ -694,11 +425,10 @@
     const subject = encodeURIComponent(`[혈압 대시보드] 주간 데이터 백업 파일 (${todayStr})`);
     const body = encodeURIComponent(`안녕하세요.\n\n혈압 기록 대시보드 주간 백업 데이터 파일입니다.\n다운로드된 CSV 파일을 이 메일에 첨부하여 보관해 주세요!\n\n발송일: ${todayStr}`);
 
-    // 메일 앱 호출
     window.location.href = `mailto:${userEmail}?subject=${subject}&body=${body}`;
   }
 
-  // CSV 파일 읽어오기 (복원)
+  // CSV 가져오기
   function importFromCSV(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -707,7 +437,6 @@
     reader.onload = function(e) {
       const content = e.target.result;
       const lines = content.split(/\r\n|\n/);
-      
       let importedCount = 0;
 
       for (let i = 1; i < lines.length; i++) {
@@ -754,6 +483,3 @@
     reader.readAsText(file, 'UTF-8');
   }
 </script>
-
-</body>
-</html>
