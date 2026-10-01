@@ -367,7 +367,346 @@
       alert('모든 데이터가 삭제되었습니다.');
     }
   }
+// 메모장에 보내기 버튼
+  <!-- 백업 버튼 영역에 추가 -->
+<button type="button" class="btn-backup" onclick="shareToIPhoneNotes()" style="background-color: #34c759; color: white;">
+  📝 아이폰 메모 앱으로 보관하기
+</button>
+<script>
+  let bpData = [];
+  let currentFontScale = 1.25;
+  let userEmail = '';
+  let lastBackupDate = '';
+  let currentDaysFilter = 7;
+  let chartInstance = null;
 
+  // 1. 아이폰(iOS) 데이터 자동 삭제 방지 (영구 저장소 권한 요청)
+  async function initStoragePersistence() {
+    if (navigator.storage && navigator.storage.persist) {
+      const isPersisted = await navigator.storage.persist();
+      console.log(`[iOS] 영구 저장소 설정 완료 여부: ${isPersisted}`);
+    }
+  }
+
+  // 안전하게 localStorage 읽기
+  function loadInitialData() {
+    try {
+      const savedData = localStorage.getItem('bpRecords');
+      if (savedData) {
+        bpData = JSON.parse(savedData);
+        if (!Array.isArray(bpData)) bpData = [];
+      }
+    } catch (e) {
+      console.error('데이터 읽기 오류:', e);
+      bpData = [];
+    }
+
+    try {
+      currentFontScale = parseFloat(localStorage.getItem('fontScale')) || 1.25;
+      userEmail = localStorage.getItem('userEmail') || '';
+      lastBackupDate = localStorage.getItem('lastBackupDate') || '';
+    } catch (e) {
+      console.error('설정값 읽기 오류:', e);
+    }
+  }
+
+  // 안전하게 localStorage 저장하기
+  function saveData() {
+    try {
+      localStorage.setItem('bpRecords', JSON.stringify(bpData));
+    } catch (e) {
+      alert('⚠️ 브라우저 저장 용량이 부족하거나 보안 설정 때문에 데이터를 저장하지 못했습니다.');
+    }
+  }
+
+  // 초기화 시 실행
+  document.addEventListener('DOMContentLoaded', () => {
+    initStoragePersistence(); // 아이폰 영구 저장 요청 실행
+    loadInitialData();
+
+    const now = new Date();
+    document.getElementById('inputDate').value = now.toISOString().substring(0, 10);
+    document.getElementById('inputTime').value = now.toTimeString().substring(0, 5);
+    
+    if (userEmail && document.getElementById('userEmailInput')) {
+      document.getElementById('userEmailInput').value = userEmail;
+    }
+
+    setFontScale(currentFontScale);
+    checkBackupReminder();
+    renderApp();
+  });
+
+  // 2. [아이폰 메모 앱으로 내보내기] 핵심 기능
+  async function shareToIPhoneNotes() {
+    if (bpData.length === 0) {
+      alert('메모 앱으로 보낼 혈압 데이터가 없습니다.');
+      return;
+    }
+
+    // 메모 앱에 저장할 텍스트 형식 가공
+    let today = new Date().toISOString().substring(0, 10);
+    let noteText = `📋 [혈압 기록 전체 백업 - ${today}]\n\n`;
+
+    // 최신순으로 정렬하여 메모 작성
+    const sorted = [...bpData].sort((a, b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
+
+    sorted.forEach(d => {
+      noteText += `• ${d.date} ${d.time} (${d.period})\n`;
+      noteText += `  혈압: ${d.sys}/${d.dia} mmHg | 맥박: ${d.pulse}bpm\n`;
+      if (d.note) noteText += `  메모: ${d.note}\n`;
+      noteText += `-----------------------\n`;
+    });
+
+    // 아이폰 공유창(Share Sheet) 호출
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: '혈압 기록 백업',
+          text: noteText
+        });
+        
+        // 백업 날짜 업데이트
+        const nowISO = new Date().toISOString();
+        localStorage.setItem('lastBackupDate', nowISO);
+        lastBackupDate = nowISO;
+        if (document.getElementById('backupAlertBanner')) {
+          document.getElementById('backupAlertBanner').style.display = 'none';
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          alert('공유하기에 실패했습니다: ' + err.message);
+        }
+      }
+    } else {
+      // 공유 기능을 지원하지 않는 경우 클립보드 복사
+      navigator.clipboard.writeText(noteText).then(() => {
+        alert('전체 혈압 기록이 복사되었습니다!\n아이폰 메모 앱을 열고 [붙여넣기] 해주세요.');
+      });
+    }
+  }
+
+  // 폰트 크기 조절
+  function setFontScale(scale) {
+    currentFontScale = scale;
+    document.documentElement.style.setProperty('--font-scale', scale);
+    try {
+      localStorage.setItem('fontScale', scale);
+    } catch (e) {}
+
+    document.querySelectorAll('.btn-font-size').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.getElementById(`btn-font-${scale}`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    if (chartInstance) renderApp();
+  }
+
+  // 백업 알림 주기(7일) 체크
+  function checkBackupReminder() {
+    if (!lastBackupDate) return;
+    const last = new Date(lastBackupDate);
+    const today = new Date();
+    const diffDays = Math.floor((today - last) / (1000 * 60 * 60 * 24));
+
+    const banner = document.getElementById('backupAlertBanner');
+    if (banner) {
+      banner.style.display = diffDays >= 7 ? 'flex' : 'none';
+    }
+  }
+
+  // 데이터 등록
+  document.getElementById('bpForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const date = document.getElementById('inputDate').value;
+    const time = document.getElementById('inputTime').value;
+    const sys = parseInt(document.getElementById('inputSys').value);
+    const dia = parseInt(document.getElementById('inputDia').value);
+    const pulse = parseInt(document.getElementById('inputPulse').value);
+    const note = document.getElementById('inputNote').value.trim();
+
+    const hour = parseInt(time.split(':')[0]);
+    const period = (hour >= 4 && hour < 12) ? '아침' : '저녁';
+
+    const record = { id: String(Date.now() + Math.random()), date, time, sys, dia, pulse, note, period };
+    
+    bpData.push(record);
+    sortData();
+    saveData();
+
+    document.getElementById('inputNote').value = '';
+    renderApp();
+  });
+
+  function sortData() {
+    bpData.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+  }
+
+  function setFilter(days, btnElement) {
+    currentDaysFilter = days;
+    document.querySelectorAll('.btn-filter').forEach(btn => btn.classList.remove('active'));
+    if (btnElement) btnElement.classList.add('active');
+    renderApp();
+  }
+
+  function getFilteredData() {
+    if (currentDaysFilter === 0) return bpData;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - currentDaysFilter);
+    return bpData.filter(d => new Date(d.date) >= cutoff);
+  }
+
+  function calculateSMA(data, windowSize) {
+    let result = [];
+    for (let i = 0; i < data.length; i++) {
+      if (i < windowSize - 1) {
+        result.push(null);
+      } else {
+        let sum = 0;
+        for (let j = 0; j < windowSize; j++) sum += data[i - j];
+        result.push((sum / windowSize).toFixed(1));
+      }
+    }
+    return result;
+  }
+
+  function renderApp() {
+    const filteredData = getFilteredData();
+    renderChart(filteredData);
+    renderSummaryTable(filteredData);
+    renderRecentTable();
+  }
+
+  function renderChart(data) {
+    const ctx = document.getElementById('bpChart').getContext('2d');
+    if (chartInstance) chartInstance.destroy();
+
+    const labels = data.map(d => `${d.date.substring(5)} ${d.time} (${d.period})`);
+    const sysData = data.map(d => d.sys);
+    const diaData = data.map(d => d.dia);
+    const sysSMA = calculateSMA(sysData, 3);
+    const sysPointColors = data.map(d => d.period === '아침' ? '#ff9800' : '#3f51b5');
+    const chartFontSize = 12 * currentFontScale;
+
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: '수축기 (mmHg)',
+            data: sysData,
+            borderColor: '#ef5350',
+            backgroundColor: sysPointColors,
+            pointRadius: 5 * currentFontScale,
+            tension: 0.2
+          },
+          {
+            label: '수축기 3회 이동평균',
+            data: sysSMA,
+            borderColor: '#b71c1c',
+            borderDash: [5, 5],
+            pointRadius: 0,
+            fill: false,
+            tension: 0.4
+          },
+          {
+            label: '이완기 (mmHg)',
+            data: diaData,
+            borderColor: '#42a5f5',
+            backgroundColor: '#42a5f5',
+            pointRadius: 4 * currentFontScale,
+            tension: 0.2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { font: { size: chartFontSize, weight: 'bold' } } }
+        },
+        scales: {
+          x: { ticks: { font: { size: chartFontSize } } },
+          y: { min: 40, max: 200, ticks: { font: { size: chartFontSize } } }
+        }
+      }
+    });
+  }
+
+  function renderSummaryTable(data) {
+    const tbody = document.getElementById('summaryTableBody');
+    tbody.innerHTML = '';
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6">해당 기간의 데이터가 없습니다.</td></tr>`;
+      return;
+    }
+
+    ['전체', '아침', '저녁'].forEach(p => {
+      const pData = p === '전체' ? data : data.filter(d => d.period === p);
+      if (pData.length === 0) return;
+
+      const sysArr = pData.map(d => d.sys);
+      const diaArr = pData.map(d => d.dia);
+      const pulseArr = pData.map(d => d.pulse);
+
+      const sysAvg = (sysArr.reduce((a,b)=>a+b, 0) / sysArr.length).toFixed(1);
+      const diaAvg = (diaArr.reduce((a,b)=>a+b, 0) / diaArr.length).toFixed(1);
+      const pulseAvg = (pulseArr.reduce((a,b)=>a+b, 0) / pulseArr.length).toFixed(1);
+
+      tbody.innerHTML += `
+        <tr>
+          <td><strong>${p}</strong></td>
+          <td>${pData.length} 회</td>
+          <td><strong>${sysAvg}</strong> / <span style="color:red">${Math.max(...sysArr)}</span> / <span style="color:blue">${Math.min(...sysArr)}</span></td>
+          <td><strong>${diaAvg}</strong> / <span style="color:red">${Math.max(...diaArr)}</span> / <span style="color:blue">${Math.min(...diaArr)}</span></td>
+          <td><strong>${pulseAvg}</strong></td>
+          <td>${getStatusBadge(sysAvg, diaAvg)}</td>
+        </tr>
+      `;
+    });
+  }
+
+  function getStatusBadge(sys, dia) {
+    if (sys < 120 && dia < 80) return `<span class="badge badge-normal">정상</span>`;
+    if (sys <= 129 && dia < 80) return `<span class="badge badge-elevated">주의 혈압</span>`;
+    if (sys <= 139 || dia <= 89) return `<span class="badge badge-high1">고혈압 1단계</span>`;
+    return `<span class="badge badge-high2">고혈압 2단계</span>`;
+  }
+
+  function renderRecentTable() {
+    const tbody = document.getElementById('recentTableBody');
+    tbody.innerHTML = '';
+    const recentData = [...bpData].reverse().slice(0, 10);
+
+    if (recentData.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6">기록된 데이터가 없습니다.</td></tr>`;
+      return;
+    }
+
+    recentData.forEach(d => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${d.date} ${d.time}</td>
+          <td>${d.period}</td>
+          <td><strong>${d.sys} / ${d.dia}</strong> mmHg</td>
+          <td>${d.pulse} bpm</td>
+          <td>${d.note ? `📌 ${d.note}` : '-'}</td>
+          <td><button class="btn-del-item" onclick="deleteRecord('${d.id}')">삭제</button></td>
+        </tr>
+      `;
+    });
+  }
+
+  function deleteRecord(id) {
+    if (confirm('이 기록을 삭제하시겠습니까?')) {
+      bpData = bpData.filter(d => String(d.id) !== String(id));
+      saveData();
+      renderApp();
+    }
+  }
+</script>
+  
   // CSV 내보내기
   function exportToCSV() {
     if (bpData.length === 0) {
