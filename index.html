@@ -22,7 +22,6 @@
       --bg: #f5f7fa;
       --card-bg: #ffffff;
       --primary: #3b82f6;
-      --primary-hover: #2563eb;
       --text: #1f2937;
       --subtext: #6b7280;
       --border: #e5e7eb;
@@ -66,7 +65,6 @@
       font-size: 1.25rem;
       margin: 0 0 16px 0;
       text-align: center;
-      color: var(--text);
     }
 
     .btn-group {
@@ -87,7 +85,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
     }
 
     .upload-btn.gallery {
@@ -125,8 +122,6 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       font-size: 0.95rem;
-      color: var(--text);
-      background: #fafafa;
     }
 
     .form-group {
@@ -212,7 +207,6 @@
       background: none;
       border: none;
       color: #ef4444;
-      cursor: pointer;
       font-size: 0.85rem;
       padding: 4px 8px;
     }
@@ -232,7 +226,6 @@
 <body>
 
 <div class="container">
-  <!-- 사진 인식 및 데이터 입력 -->
   <div class="card">
     <h1>혈압 관리 매니저</h1>
     
@@ -242,12 +235,12 @@
         <input type="file" id="cameraInput" accept="image/*" capture="environment">
       </label>
       <label class="upload-btn gallery">
-        🖼️ 앨범에서 선택
+        🖼️ 앨범 선택
         <input type="file" id="galleryInput" accept="image/*">
       </label>
     </div>
 
-    <div id="loading">사진 및 날짜/시간 분석 중... ⏳</div>
+    <div id="loading">사진 및 날짜 분석 중... ⏳</div>
 
     <div class="date-picker-group">
       <label>측정 날짜 및 시간</label>
@@ -272,18 +265,17 @@
     <button class="action-btn" onclick="addRecord()">기록 저장</button>
   </div>
 
-  <!-- 기록 목록 및 내보내기 -->
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <h2 style="font-size: 1.1rem; margin:0;">최근 기록</h2>
-      <button class="action-btn export-btn" onclick="exportToNotes()">아이폰 메모로 내보내기 📝</button>
+      <button class="action-btn export-btn" onclick="exportToNotes()">메모로 내보내기 📝</button>
     </div>
     <ul id="recordList"></ul>
   </div>
 
   <div class="notice-box">
-    💡 <b>독립 앱 환경으로 사용법 (PWA):</b><br>
-    사파리(Safari) 하단 <b>공유 버튼(네모+화살표)</b> ➔ <b>'홈 화면에 추가'</b>를 누르면 브라우저 주소창 없이 앱처럼 열립니다.
+    💡 <b>독립 앱(PWA) 사용법:</b><br>
+    사파리(Safari) 하단 <b>공유 버튼(네모+화살표)</b> ➔ <b>'홈 화면에 추가'</b>를 누르면 전체화면 앱처럼 열립니다.
   </div>
 </div>
 
@@ -295,14 +287,14 @@
     renderRecords();
   };
 
-  // 현재 시간을 datetime-local 형식으로 설정
+  // 현재 시간 세팅
   function setDefaultDatetime(dateObj = new Date()) {
     const tzOffset = dateObj.getTimezoneOffset() * 60000;
     const localISOTime = (new Date(dateObj - tzOffset)).toISOString().slice(0, 16);
     document.getElementById('recordDatetime').value = localISOTime;
   }
 
-  // 파일 입력 처리 (카메라 / 앨범 공통)
+  // 파일 선택 이벤트 (카메라/앨범)
   document.getElementById('cameraInput').addEventListener('change', handleFileSelect);
   document.getElementById('galleryInput').addEventListener('change', handleFileSelect);
 
@@ -314,7 +306,7 @@
     loading.style.display = 'block';
 
     try {
-      // 1. EXIF 날짜/시간 정보 추출
+      // 1. EXIF 메타데이터로 원본 사진 촬영 시간 추출
       try {
         const exifData = await exifr.parse(file, ['DateTimeOriginal', 'CreateDate']);
         const photoDate = exifData?.DateTimeOriginal || exifData?.CreateDate;
@@ -322,7 +314,6 @@
         if (photoDate) {
           setDefaultDatetime(new Date(photoDate));
         } else if (file.lastModified) {
-          // EXIF가 없는 경우 파일 수정 시간 활용
           setDefaultDatetime(new Date(file.lastModified));
         }
       } catch (exifErr) {
@@ -331,7 +322,7 @@
         }
       }
 
-      // 2. OCR 숫자인식 (Tesseract.js)
+      // 2. Tesseract.js로 OCR(숫자) 인식
       const worker = await Tesseract.createWorker('eng');
       const ret = await worker.recognize(file);
       await worker.terminate();
@@ -345,7 +336,7 @@
           document.getElementById('dia').value = validNumbers[1] || '';
           document.getElementById('pul').value = validNumbers[2] || '';
         } else {
-          alert('혈압 계기판 숫자를 명확히 인식하지 못했습니다. 수동으로 숫자를 확인해 주세요.');
+          alert('혈압 수치를 정확히 인식하지 못했습니다. 수동으로 입력해 주세요.');
         }
       } else {
         alert('사진에서 숫자를 찾지 못했습니다. 수동으로 입력해 주세요.');
@@ -354,11 +345,11 @@
       alert('이미지 분석 중 오류가 발생했습니다.');
     } finally {
       loading.style.display = 'none';
-      e.target.value = ''; // 동일 파일 재선택 가능하도록 초기화
+      e.target.value = ''; 
     }
   }
 
-  // 기록 저장
+  // 기록 추가
   function addRecord() {
     const sys = document.getElementById('sys').value;
     const dia = document.getElementById('dia').value;
@@ -372,12 +363,8 @@
 
     const dateObj = rawDatetime ? new Date(rawDatetime) : new Date();
     const formattedDate = dateObj.toLocaleString('ko-KR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: false
     });
 
     const newRecord = {
@@ -390,12 +377,10 @@
     };
 
     records.unshift(newRecord);
-    // 날짜 역순 정렬
-    records.sort((a, b) => b.timestamp - a.timestamp);
+    records.sort((a, b) => b.timestamp - a.timestamp); // 최신 날짜순 정렬
 
     localStorage.setItem('bpRecords', JSON.stringify(records));
     
-    // 입력 필드 초기화
     document.getElementById('sys').value = '';
     document.getElementById('dia').value = '';
     document.getElementById('pul').value = '';
@@ -411,7 +396,7 @@
     renderRecords();
   }
 
-  // 기록 목록 출력
+  // 기록 리스트 렌더링
   function renderRecords() {
     const list = document.getElementById('recordList');
     list.innerHTML = '';
@@ -434,7 +419,7 @@
     });
   }
 
-  // 아이폰 메모로 내보내기 (공유)
+  // 아이폰 메모 공유 (Share API)
   function exportToNotes() {
     if (records.length === 0) {
       alert('내보낼 기록이 없습니다.');
