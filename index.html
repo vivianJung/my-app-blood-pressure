@@ -4,8 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>혈압 관리 대시보드</title>
+
+  <!-- iOS 및 모바일 독립 웹앱(Standalone PWA) 설정 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="혈압대시보드">
+  <meta name="theme-color" content="#2c3e50">
+
+  <!-- 웹앱 매니페스트 (독립 실행 모드) -->
+  <link rel="manifest" href='data:application/manifest+json,{"name":"혈압 기록 대시보드","short_name":"혈압대시보드","start_url":".","display":"standalone","background_color":"#f5f7fa","theme_color":"#2c3e50"}'>
+
+  <!-- 아이폰 홈 화면 터치 아이콘 (🩸 모양) -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩸</text></svg>">
+
   <!-- Chart.js 라이브러리 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     :root {
       --font-scale: 1.25;
@@ -23,6 +38,7 @@
       margin: 0;
       padding: 12px;
       box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .container {
@@ -297,11 +313,10 @@
     </div>
   </div>
 
-  <!-- 백업 및 외부 보관 (아이폰 메모 앱 연동) -->
+  <!-- 백업 및 외부 보관 -->
   <div class="card">
     <h2>🔒 데이터 안전 보관 & 백업</h2>
     <div class="form-group">
-      <!-- 1. 아이폰 메모 앱 공유 버튼 -->
       <button type="button" class="btn-notes" onclick="shareToIPhoneNotes()">
         📝 아이폰 메모 앱으로 전체 데이터 보내기
       </button>
@@ -336,7 +351,23 @@
   let currentDaysFilter = 7;
   let chartInstance = null;
 
-  // 1. 아이폰(iOS) 자동 저장소 삭제 방지 요청
+  // iOS Standalone(웹앱) 모드 내 링크 클릭 시 사파리로 튕김 방지
+  if (("standalone" in window.navigator) && window.navigator.standalone) {
+    document.addEventListener('click', function(e) {
+      let node = e.target;
+      while (node && node.nodeName !== 'A') {
+        node = node.parentNode;
+      }
+      if (node && node.nodeName === 'A' && node.getAttribute('href') && !node.getAttribute('target')) {
+        if (node.hostname === window.location.hostname || !node.hostname) {
+          e.preventDefault();
+          window.location.href = node.getAttribute('href');
+        }
+      }
+    }, false);
+  }
+
+  // 아이폰(iOS) 영구 저장소 보장 요청
   async function initStoragePersistence() {
     if (navigator.storage && navigator.storage.persist) {
       const isPersisted = await navigator.storage.persist();
@@ -391,7 +422,7 @@
     renderApp();
   });
 
-  // 2. 아이폰 메모 앱 공유 기능
+  // 아이폰 메모 앱 공유 기능
   async function shareToIPhoneNotes() {
     if (bpData.length === 0) {
       alert('메모 앱으로 보낼 혈압 데이터가 없습니다.');
