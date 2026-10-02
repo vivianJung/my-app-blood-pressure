@@ -2,802 +2,285 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>혈압 관리 대시보드</title>
-
-  <!-- iOS 및 모바일 독립 웹앱(Standalone PWA) 설정 -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="혈압대시보드">
-  <meta name="theme-color" content="#2c3e50">
-
-  <!-- 웹앱 매니페스트 (독립 실행 모드) -->
-  <link rel="manifest" href='data:application/manifest+json,{"name":"혈압 기록 대시보드","short_name":"혈압대시보드","start_url":".","display":"standalone","background_color":"#f5f7fa","theme_color":"#2c3e50"}'>
-
-  <!-- 아이폰 홈 화면 터치 아이콘 (🩸 모양) -->
-  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩸</text></svg>">
-
-  <!-- Chart.js 라이브러리 -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>혈압 관리 매니저</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     :root {
-      --font-scale: 1.25;
-      --primary-color: #2196f3;
-      --bg-color: #f5f7fa;
+      --bg: #f5f7fa;
       --card-bg: #ffffff;
-      --text-color: #333333;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --text: #1f2937;
+      --subtext: #6b7280;
+      --border: #e5e7eb;
     }
-
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      font-size: calc(14px * var(--font-scale));
-      background-color: var(--bg-color);
-      color: var(--text-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
       margin: 0;
-      padding: 12px;
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
+      padding: 16px;
+      display: flex;
+      justify-content: center;
     }
-
     .container {
-      max-width: 800px;
-      margin: 0 auto;
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
-
     .card {
       background: var(--card-bg);
-      border-radius: 14px;
-      padding: 16px;
-      margin-bottom: 16px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     }
-
-    h1 { font-size: calc(20px * var(--font-scale)); margin-top: 0; margin-bottom: 12px; text-align: center; }
-    h2 { font-size: calc(16px * var(--font-scale)); margin-top: 0; margin-bottom: 12px; }
-
-    /* 글자 크기 조절 버튼 */
-    .font-control {
-      display: flex;
-      justify-content: flex-end;
-      gap: 6px;
-      margin-bottom: 12px;
-    }
-
-    .btn-font-size {
-      background: #e2e8f0;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-    }
-
-    .btn-font-size.active {
-      background: var(--primary-color);
-      color: white;
-      font-weight: bold;
-    }
-
-    /* 백업 알림 배너 */
-    .banner {
-      background: #fff3cd;
-      color: #856404;
-      padding: 12px;
-      border-radius: 10px;
-      margin-bottom: 16px;
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      font-size: calc(13px * var(--font-scale));
-    }
-
-    /* 폼 입출력 */
-    .form-group {
-      margin-bottom: 10px;
-    }
-
-    label {
+    h1 { font-size: 1.25rem; margin: 0 0 12px 0; text-align: center; }
+    
+    .upload-btn {
       display: block;
-      font-weight: bold;
-      margin-bottom: 4px;
-      font-size: calc(13px * var(--font-scale));
-    }
-
-    input, select {
       width: 100%;
-      padding: 10px;
-      font-size: calc(14px * var(--font-scale));
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
+      padding: 14px;
+      background-color: var(--primary);
+      color: white;
+      text-align: center;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
       box-sizing: border-box;
     }
+    input[type="file"] { display: none; }
 
-    .form-row {
-      display: flex;
-      gap: 8px;
+    #loading {
+      display: none;
+      text-align: center;
+      color: var(--primary);
+      font-weight: bold;
+      margin-top: 10px;
     }
 
-    .form-row > div { flex: 1; }
+    .form-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .input-box {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .input-box label { font-size: 0.75rem; color: var(--subtext); font-weight: 600; }
+    .input-box input {
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      text-align: center;
+    }
 
-    button {
+    .action-btn {
       width: 100%;
+      margin-top: 12px;
       padding: 12px;
-      font-size: calc(14px * var(--font-scale));
-      font-weight: bold;
+      background: #10b981;
+      color: white;
       border: none;
       border-radius: 8px;
+      font-weight: 600;
       cursor: pointer;
-      margin-top: 6px;
-      transition: background 0.2s;
     }
 
-    .btn-primary { background-color: var(--primary-color); color: white; }
-    .btn-notes { background-color: #34c759; color: white; }
-    .btn-email { background-color: #5856d6; color: white; }
-    .btn-csv { background-color: #007aff; color: white; }
-    .btn-danger { background-color: #ff3b30; color: white; }
+    .export-btn {
+      background: #f59e0b;
+      margin-top: 8px;
+    }
 
-    /* 기간 필터 버튼 */
-    .filter-group {
+    ul { list-style: none; padding: 0; margin: 0; }
+    li {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
       display: flex;
-      gap: 6px;
-      margin-bottom: 12px;
+      justify-content: space-between;
+      align-items: center;
     }
-
-    .btn-filter {
-      flex: 1;
-      background: #e2e8f0;
-      color: #333;
-      padding: 8px;
-      margin: 0;
-    }
-
-    .btn-filter.active {
-      background: var(--primary-color);
-      color: white;
-    }
-
-    /* 차트 박스 */
-    .chart-container {
-      position: relative;
-      height: 320px;
-      width: 100%;
-    }
-
-    /* 테이블 */
-    .table-responsive {
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: center;
-      font-size: calc(12px * var(--font-scale));
-    }
-
-    th, td {
-      padding: 8px 4px;
-      border-bottom: 1px solid #e2e8f0;
-    }
-
-    th { background-color: #f1f5f9; }
-
-    .badge {
-      padding: 3px 6px;
-      border-radius: 10px;
-      color: white;
-      font-weight: bold;
-      font-size: calc(10px * var(--font-scale));
-    }
-    .badge-normal { background-color: #34c759; }
-    .badge-elevated { background-color: #ff9500; }
-    .badge-high1 { background-color: #ff3b30; }
-    .badge-high2 { background-color: #af52de; }
-
-    .btn-del-item {
-      background-color: #ff3b30;
-      color: white;
+    li:last-child { border-bottom: none; }
+    .record-date { font-size: 0.8rem; color: var(--subtext); }
+    .record-vals { font-weight: 600; }
+    .delete-btn {
+      background: none;
       border: none;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      width: auto;
-      margin: 0;
+      color: #ef4444;
+      cursor: pointer;
+      font-size: 0.85rem;
     }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <!-- 글자 크기 설정 -->
-  <div class="font-control">
-    <button class="btn-font-size" id="btn-font-1" onclick="setFontScale(1)">보통 글자</button>
-    <button class="btn-font-size" id="btn-font-1.25" onclick="setFontScale(1.25)">큰 글자</button>
-    <button class="btn-font-size" id="btn-font-1.5" onclick="setFontScale(1.5)">매우 큰 글자</button>
-  </div>
-
-  <!-- 백업 권장 알림 배너 -->
-  <div id="backupAlertBanner" class="banner">
-    <span>⚠️ 백업한 지 7일이 지났습니다. 메모 앱이나 이메일로 데이터를 보관하세요!</span>
-  </div>
-
-  <!-- 혈압 입력 폼 -->
+  <!-- 사진 인식 및 입력 카드리프 -->
   <div class="card">
-    <h2>🩸 혈압/맥박 기록하기</h2>
-    <form id="bpForm">
-      <div class="form-row form-group">
-        <div>
-          <label for="inputDate">날짜</label>
-          <input type="date" id="inputDate" required>
-        </div>
-        <div>
-          <label for="inputTime">시간</label>
-          <input type="time" id="inputTime" required>
-        </div>
-      </div>
-      <div class="form-row form-group">
-        <div>
-          <label for="inputSys">수축기 (최고)</label>
-          <input type="number" id="inputSys" placeholder="120" min="50" max="250" required>
-        </div>
-        <div>
-          <label for="inputDia">이완기 (최저)</label>
-          <input type="number" id="inputDia" placeholder="80" min="30" max="180" required>
-        </div>
-        <div>
-          <label for="inputPulse">맥박 (회/분)</label>
-          <input type="number" id="inputPulse" placeholder="70" min="30" max="200" required>
-        </div>
-      </div>
-      <div class="form-group">
-        <label for="inputNote">특이사항 (선택)</label>
-        <input type="text" id="inputNote" placeholder="예: 두통, 운동 후, 복약 전">
-      </div>
-      <button type="submit" class="btn-primary">저장하기</button>
-    </form>
-  </div>
+    <h1>혈압 기록하기</h1>
+    <label class="upload-btn">
+      📷 혈압계 사진 찍기 / 선택
+      <input type="file" id="imageInput" accept="image/*" capture="environment">
+    </label>
+    <div id="loading">사진 분석 중... ⏳</div>
 
-  <!-- 그래프 차트 -->
-  <div class="card">
-    <h2>📈 혈압 추이 그래프</h2>
-    <div class="filter-group">
-      <button class="btn-filter active" onclick="setFilter(7, this)">최근 7일</button>
-      <button class="btn-filter" onclick="setFilter(30, this)">최근 30일</button>
-      <button class="btn-filter" onclick="setFilter(0, this)">전체 보기</button>
-    </div>
-    <div class="chart-container">
-      <canvas id="bpChart"></canvas>
-    </div>
-  </div>
-
-  <!-- 요약 통계 -->
-  <div class="card">
-    <h2>📊 기간별 평균 요약</h2>
-    <div class="table-responsive">
-      <table>
-        <thead>
-          <tr>
-            <th>구분</th>
-            <th>횟수</th>
-            <th>수축기 (평균/최고/최저)</th>
-            <th>이완기 (평균/최고/최저)</th>
-            <th>맥박 평균</th>
-            <th>상태</th>
-          </tr>
-        </thead>
-        <tbody id="summaryTableBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- 최근 기록 목록 -->
-  <div class="card">
-    <h2>📋 최근 기록 (최신 10건)</h2>
-    <div class="table-responsive">
-      <table>
-        <thead>
-          <tr>
-            <th>일시</th>
-            <th>분류</th>
-            <th>혈압</th>
-            <th>맥박</th>
-            <th>특이사항</th>
-            <th>관리</th>
-          </tr>
-        </thead>
-        <tbody id="recentTableBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- 백업 및 외부 보관 -->
-  <div class="card">
-    <h2>🔒 데이터 안전 보관 & 백업</h2>
     <div class="form-group">
-      <button type="button" class="btn-notes" onclick="shareToIPhoneNotes()">
-        📝 아이폰 메모 앱으로 전체 데이터 보내기
-      </button>
-    </div>
-
-    <div class="form-group" style="margin-top: 16px;">
-      <label for="userEmailInput">이메일 주소 등록</label>
-      <div class="form-row">
-        <input type="email" id="userEmailInput" placeholder="example@email.com">
-        <button type="button" class="btn-primary" style="width: 80px; margin:0;" onclick="saveUserEmail()">저장</button>
+      <div class="input-box">
+        <label>수축기 (최고)</label>
+        <input type="number" id="sys" placeholder="120">
       </div>
-      <button type="button" class="btn-email" onclick="sendEmailBackup()">✉️ 이메일로 백업 파일 받기</button>
+      <div class="input-box">
+        <label>이완기 (최저)</label>
+        <input type="number" id="dia" placeholder="80">
+      </div>
+      <div class="input-box">
+        <label>맥박 (회/분)</label>
+        <input type="number" id="pul" placeholder="70">
+      </div>
     </div>
+    <button class="action-btn" onclick="addRecord()">기록 저장</button>
+  </div>
 
-    <div class="form-group" style="margin-top: 16px;">
-      <button type="button" class="btn-csv" onclick="exportToCSV()">📥 CSV 파일 내보내기</button>
-      <button type="button" class="btn-primary" style="background-color: #8e8e93;" onclick="document.getElementById('csvFileInput').click()">📤 CSV 파일 불러오기</button>
-      <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="importFromCSV(event)">
+  <!-- 기록 목록 및 내보내기 -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="font-size: 1.1rem; margin:0;">최근 기록</h2>
+      <button class="action-btn export-btn" style="width: auto; padding: 6px 12px; margin:0;" onclick="exportToNotes()">아이폰 메모로 내보내기 📝</button>
     </div>
-
-    <div style="margin-top: 20px; text-align: right;">
-      <button type="button" class="btn-danger" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="clearAllData()">⚠️ 전체 데이터 초기화</button>
-    </div>
+    <ul id="recordList"></ul>
   </div>
 </div>
 
 <script>
-  let bpData = [];
-  let currentFontScale = 1.25;
-  let userEmail = '';
-  let lastBackupDate = '';
-  let currentDaysFilter = 7;
-  let chartInstance = null;
+  let records = JSON.parse(localStorage.getItem('bpRecords')) || [];
 
-  // iOS Standalone(웹앱) 모드 내 링크 클릭 시 사파리로 튕김 방지
-  if (("standalone" in window.navigator) && window.navigator.standalone) {
-    document.addEventListener('click', function(e) {
-      let node = e.target;
-      while (node && node.nodeName !== 'A') {
-        node = node.parentNode;
-      }
-      if (node && node.nodeName === 'A' && node.getAttribute('href') && !node.getAttribute('target')) {
-        if (node.hostname === window.location.hostname || !node.hostname) {
-          e.preventDefault();
-          window.location.href = node.getAttribute('href');
+  window.onload = () => renderRecords();
+
+  // OCR 사진 인식 처리
+  document.getElementById('imageInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const loading = document.getElementById('loading');
+    loading.style.display = 'block';
+
+    try {
+      const worker = await Tesseract.createWorker('eng');
+      const ret = await worker.recognize(file);
+      await worker.terminate();
+
+      // 숫지만 추출
+      const numbers = ret.data.text.match(/\d+/g);
+      
+      if (numbers && numbers.length >= 2) {
+        // 혈압 범위에 맞는 숫자 매핑 (기본적인 필터링)
+        const validNumbers = numbers.map(Number).filter(n => n >= 40 && n <= 220);
+        
+        if (validNumbers.length >= 2) {
+          document.getElementById('sys').value = validNumbers[0] || '';
+          document.getElementById('dia').value = validNumbers[1] || '';
+          document.getElementById('pul').value = validNumbers[2] || '';
+        } else {
+          alert('인식된 숫자 범위를 확인해주세요. 수동으로 수정 가능합니다.');
         }
+      } else {
+        alert('숫자를 인식하지 못했습니다. 수동으로 입력해 주세요.');
       }
-    }, false);
-  }
-
-  // 아이폰(iOS) 영구 저장소 보장 요청
-  async function initStoragePersistence() {
-    if (navigator.storage && navigator.storage.persist) {
-      const isPersisted = await navigator.storage.persist();
-      console.log(`[iOS] 영구 저장소 보장 상태: ${isPersisted}`);
+    } catch (err) {
+      alert('이미지 분석 중 오류가 발생했습니다.');
+    } finally {
+      loading.style.display = 'none';
     }
-  }
-
-  // 데이터 로딩
-  function loadInitialData() {
-    try {
-      const savedData = localStorage.getItem('bpRecords');
-      if (savedData) {
-        bpData = JSON.parse(savedData);
-        if (!Array.isArray(bpData)) bpData = [];
-      }
-    } catch (e) {
-      console.error('데이터 읽기 오류:', e);
-      bpData = [];
-    }
-
-    try {
-      currentFontScale = parseFloat(localStorage.getItem('fontScale')) || 1.25;
-      userEmail = localStorage.getItem('userEmail') || '';
-      lastBackupDate = localStorage.getItem('lastBackupDate') || '';
-    } catch (e) {}
-  }
-
-  // 데이터 저장
-  function saveData() {
-    try {
-      localStorage.setItem('bpRecords', JSON.stringify(bpData));
-    } catch (e) {
-      alert('⚠️ 브라우저 저장 용량이 부족하거나 보안 설정 때문에 데이터를 저장하지 못했습니다.');
-    }
-  }
-
-  // 초기화
-  document.addEventListener('DOMContentLoaded', () => {
-    initStoragePersistence();
-    loadInitialData();
-
-    const now = new Date();
-    document.getElementById('inputDate').value = now.toISOString().substring(0, 10);
-    document.getElementById('inputTime').value = now.toTimeString().substring(0, 5);
-    
-    if (userEmail) {
-      document.getElementById('userEmailInput').value = userEmail;
-    }
-
-    setFontScale(currentFontScale);
-    checkBackupReminder();
-    renderApp();
   });
 
-  // 아이폰 메모 앱 공유 기능
-  async function shareToIPhoneNotes() {
-    if (bpData.length === 0) {
-      alert('메모 앱으로 보낼 혈압 데이터가 없습니다.');
+  // 기록 추가
+  function addRecord() {
+    const sys = document.getElementById('sys').value;
+    const dia = document.getElementById('dia').value;
+    const pul = document.getElementById('pul').value;
+
+    if (!sys || !dia) {
+      alert('수축기와 이완기 혈압을 입력해주세요.');
       return;
     }
 
-    let today = new Date().toISOString().substring(0, 10);
-    let noteText = `📋 [혈압 기록 전체 백업 - ${today}]\n\n`;
+    const newRecord = {
+      id: Date.now(),
+      date: new Date().toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      sys: sys,
+      dia: dia,
+      pul: pul || '-'
+    };
 
-    const sorted = [...bpData].sort((a, b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
+    records.unshift(newRecord);
+    localStorage.setItem('bpRecords', JSON.stringify(records));
+    
+    // 입력창 초기화
+    document.getElementById('sys').value = '';
+    document.getElementById('dia').value = '';
+    document.getElementById('pul').value = '';
 
-    sorted.forEach(d => {
-      noteText += `• ${d.date} ${d.time} (${d.period})\n`;
-      noteText += `  혈압: ${d.sys}/${d.dia} mmHg | 맥박: ${d.pulse}bpm\n`;
-      if (d.note) noteText += `  특이사항: ${d.note}\n`;
-      noteText += `-----------------------\n`;
+    renderRecords();
+  }
+
+  // 삭제
+  function deleteRecord(id) {
+    records = records.filter(r => r.id !== id);
+    localStorage.setItem('bpRecords', JSON.stringify(records));
+    renderRecords();
+  }
+
+  // 목록 출력
+  function renderRecords() {
+    const list = document.getElementById('recordList');
+    list.innerHTML = '';
+    
+    if (records.length === 0) {
+      list.innerHTML = '<li style="color:var(--subtext); text-align:center;">저장된 기록이 없습니다.</li>';
+      return;
+    }
+
+    records.forEach(r => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <div>
+          <div class="record-vals">${r.sys} / ${r.dia} mmHg <span style="font-size:0.85rem; font-weight:normal; color:var(--subtext);">(${r.pul} bpm)</span></div>
+          <div class="record-date">${r.date}</div>
+        </div>
+        <button class="delete-btn" onclick="deleteRecord(${r.id})">삭제</button>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  // 아이폰 메모 및 공유하기 기능
+  function exportToNotes() {
+    if (records.length === 0) {
+      alert('내보낼 기록이 없습니다.');
+      return;
+    }
+
+    let text = "[혈압 기록 백업]\n\n";
+    records.forEach(r => {
+      text += `${r.date} - ${r.sys}/${r.dia} mmHg (맥박: ${r.pul})\n`;
     });
 
     if (navigator.share) {
-      try {
-        await navigator.share({
-          title: '혈압 기록 백업',
-          text: noteText
-        });
-        
-        const nowISO = new Date().toISOString();
-        localStorage.setItem('lastBackupDate', nowISO);
-        lastBackupDate = nowISO;
-        document.getElementById('backupAlertBanner').style.display = 'none';
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          alert('공유 실패: ' + err.message);
-        }
-      }
+      navigator.share({
+        title: '혈압 기록 백업',
+        text: text
+      }).catch(() => {});
     } else {
-      navigator.clipboard.writeText(noteText).then(() => {
-        alert('전체 혈압 기록이 복사되었습니다!\n아이폰 메모 앱을 열고 [붙여넣기] 해주세요.');
-      });
+      // iOS Share Sheet 미지원시 클립보드 복사
+      navigator.clipboard.writeText(text);
+      alert('기록이 클립보드에 복사되었습니다. 아이폰 메모 앱에 붙여넣기 하세요!');
     }
-  }
-
-  // 이메일 주소 저장
-  function saveUserEmail() {
-    const email = document.getElementById('userEmailInput').value.trim();
-    if (!email || !email.includes('@')) {
-      alert('올바른 이메일 주소를 입력해 주세요.');
-      return;
-    }
-    userEmail = email;
-    try {
-      localStorage.setItem('userEmail', email);
-      alert('백업 수신 이메일 주소가 저장되었습니다.');
-    } catch (e) {}
-  }
-
-  // 백업 주기 알림 (7일)
-  function checkBackupReminder() {
-    if (!lastBackupDate) return;
-    const last = new Date(lastBackupDate);
-    const today = new Date();
-    const diffDays = Math.floor((today - last) / (1000 * 60 * 60 * 24));
-
-    document.getElementById('backupAlertBanner').style.display = diffDays >= 7 ? 'flex' : 'none';
-  }
-
-  // 폰트 크기 변경
-  function setFontScale(scale) {
-    currentFontScale = scale;
-    document.documentElement.style.setProperty('--font-scale', scale);
-    try {
-      localStorage.setItem('fontScale', scale);
-    } catch (e) {}
-
-    document.querySelectorAll('.btn-font-size').forEach(btn => btn.classList.remove('active'));
-    const activeBtn = document.getElementById(`btn-font-${scale}`);
-    if (activeBtn) activeBtn.classList.add('active');
-
-    if (chartInstance) renderApp();
-  }
-
-  // 데이터 등록
-  document.getElementById('bpForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    
-    const date = document.getElementById('inputDate').value;
-    const time = document.getElementById('inputTime').value;
-    const sys = parseInt(document.getElementById('inputSys').value);
-    const dia = parseInt(document.getElementById('inputDia').value);
-    const pulse = parseInt(document.getElementById('inputPulse').value);
-    const note = document.getElementById('inputNote').value.trim();
-
-    const hour = parseInt(time.split(':')[0]);
-    const period = (hour >= 4 && hour < 12) ? '아침' : '저녁';
-
-    const record = { id: String(Date.now() + Math.random()), date, time, sys, dia, pulse, note, period };
-    
-    bpData.push(record);
-    sortData();
-    saveData();
-
-    document.getElementById('inputNote').value = '';
-    renderApp();
-  });
-
-  function sortData() {
-    bpData.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
-  }
-
-  function setFilter(days, btnElement) {
-    currentDaysFilter = days;
-    document.querySelectorAll('.btn-filter').forEach(btn => btn.classList.remove('active'));
-    if (btnElement) btnElement.classList.add('active');
-    renderApp();
-  }
-
-  function getFilteredData() {
-    if (currentDaysFilter === 0) return bpData;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - currentDaysFilter);
-    return bpData.filter(d => new Date(d.date) >= cutoff);
-  }
-
-  function calculateSMA(data, windowSize) {
-    let result = [];
-    for (let i = 0; i < data.length; i++) {
-      if (i < windowSize - 1) {
-        result.push(null);
-      } else {
-        let sum = 0;
-        for (let j = 0; j < windowSize; j++) sum += data[i - j];
-        result.push((sum / windowSize).toFixed(1));
-      }
-    }
-    return result;
-  }
-
-  function renderApp() {
-    const filteredData = getFilteredData();
-    renderChart(filteredData);
-    renderSummaryTable(filteredData);
-    renderRecentTable();
-  }
-
-  function renderChart(data) {
-    const ctx = document.getElementById('bpChart').getContext('2d');
-    if (chartInstance) chartInstance.destroy();
-
-    const labels = data.map(d => `${d.date.substring(5)} ${d.time} (${d.period})`);
-    const sysData = data.map(d => d.sys);
-    const diaData = data.map(d => d.dia);
-    const sysSMA = calculateSMA(sysData, 3);
-    const sysPointColors = data.map(d => d.period === '아침' ? '#ff9800' : '#3f51b5');
-    const chartFontSize = 12 * currentFontScale;
-
-    chartInstance = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: '수축기 (mmHg)',
-            data: sysData,
-            borderColor: '#ef5350',
-            backgroundColor: sysPointColors,
-            pointRadius: 5 * currentFontScale,
-            tension: 0.2
-          },
-          {
-            label: '수축기 3회 이동평균',
-            data: sysSMA,
-            borderColor: '#b71c1c',
-            borderDash: [5, 5],
-            pointRadius: 0,
-            fill: false,
-            tension: 0.4
-          },
-          {
-            label: '이완기 (mmHg)',
-            data: diaData,
-            borderColor: '#42a5f5',
-            backgroundColor: '#42a5f5',
-            pointRadius: 4 * currentFontScale,
-            tension: 0.2
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { labels: { font: { size: chartFontSize, weight: 'bold' } } }
-        },
-        scales: {
-          x: { ticks: { font: { size: chartFontSize } } },
-          y: { min: 40, max: 200, ticks: { font: { size: chartFontSize } } }
-        }
-      }
-    });
-  }
-
-  function renderSummaryTable(data) {
-    const tbody = document.getElementById('summaryTableBody');
-    tbody.innerHTML = '';
-    if (data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6">해당 기간의 데이터가 없습니다.</td></tr>`;
-      return;
-    }
-
-    ['전체', '아침', '저녁'].forEach(p => {
-      const pData = p === '전체' ? data : data.filter(d => d.period === p);
-      if (pData.length === 0) return;
-
-      const sysArr = pData.map(d => d.sys);
-      const diaArr = pData.map(d => d.dia);
-      const pulseArr = pData.map(d => d.pulse);
-
-      const sysAvg = (sysArr.reduce((a,b)=>a+b, 0) / sysArr.length).toFixed(1);
-      const diaAvg = (diaArr.reduce((a,b)=>a+b, 0) / diaArr.length).toFixed(1);
-      const pulseAvg = (pulseArr.reduce((a,b)=>a+b, 0) / pulseArr.length).toFixed(1);
-
-      tbody.innerHTML += `
-        <tr>
-          <td><strong>${p}</strong></td>
-          <td>${pData.length} 회</td>
-          <td><strong>${sysAvg}</strong> / <span style="color:red">${Math.max(...sysArr)}</span> / <span style="color:blue">${Math.min(...sysArr)}</span></td>
-          <td><strong>${diaAvg}</strong> / <span style="color:red">${Math.max(...diaArr)}</span> / <span style="color:blue">${Math.min(...diaArr)}</span></td>
-          <td><strong>${pulseAvg}</strong></td>
-          <td>${getStatusBadge(sysAvg, diaAvg)}</td>
-        </tr>
-      `;
-    });
-  }
-
-  function getStatusBadge(sys, dia) {
-    if (sys < 120 && dia < 80) return `<span class="badge badge-normal">정상</span>`;
-    if (sys <= 129 && dia < 80) return `<span class="badge badge-elevated">주의 혈압</span>`;
-    if (sys <= 139 || dia <= 89) return `<span class="badge badge-high1">고혈압 1단계</span>`;
-    return `<span class="badge badge-high2">고혈압 2단계</span>`;
-  }
-
-  function renderRecentTable() {
-    const tbody = document.getElementById('recentTableBody');
-    tbody.innerHTML = '';
-    const recentData = [...bpData].reverse().slice(0, 10);
-
-    if (recentData.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6">기록된 데이터가 없습니다.</td></tr>`;
-      return;
-    }
-
-    recentData.forEach(d => {
-      tbody.innerHTML += `
-        <tr>
-          <td>${d.date} ${d.time}</td>
-          <td>${d.period}</td>
-          <td><strong>${d.sys} / ${d.dia}</strong> mmHg</td>
-          <td>${d.pulse} bpm</td>
-          <td>${d.note ? `📌 ${d.note}` : '-'}</td>
-          <td><button class="btn-del-item" onclick="deleteRecord('${d.id}')">삭제</button></td>
-        </tr>
-      `;
-    });
-  }
-
-  function deleteRecord(id) {
-    if (confirm('이 기록을 삭제하시겠습니까?')) {
-      bpData = bpData.filter(d => String(d.id) !== String(id));
-      saveData();
-      renderApp();
-    }
-  }
-
-  function clearAllData() {
-    if (confirm('⚠️ 정말로 모든 혈압 데이터를 삭제하시겠습니까?')) {
-      try { localStorage.removeItem('bpRecords'); } catch (e) {}
-      bpData = [];
-      renderApp();
-      alert('모든 데이터가 삭제되었습니다.');
-    }
-  }
-
-  function exportToCSV() {
-    if (bpData.length === 0) {
-      alert('백업할 데이터가 없습니다.');
-      return false;
-    }
-
-    let csvContent = '\uFEFF날짜,시간,분류,수축기,이완기,맥박수,특이사항\n';
-    bpData.forEach(d => {
-      const noteStr = d.note ? `"${d.note.replace(/"/g, '""')}"` : '';
-      csvContent += `${d.date},${d.time},${d.period},${d.sys},${d.dia},${d.pulse},${noteStr}\n`;
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const todayStr = new Date().toISOString().substring(0, 10).replace(/-/g, '');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `혈압기록_백업_${todayStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    const nowISO = new Date().toISOString();
-    try { localStorage.setItem('lastBackupDate', nowISO); } catch (e) {}
-    lastBackupDate = nowISO;
-    document.getElementById('backupAlertBanner').style.display = 'none';
-
-    return true;
-  }
-
-  function sendEmailBackup() {
-    if (!userEmail) {
-      alert('먼저 이메일 주소를 입력하고 [저장] 버튼을 눌러주세요.');
-      document.getElementById('userEmailInput').focus();
-      return;
-    }
-
-    const downloaded = exportToCSV();
-    if (!downloaded) return;
-
-    const todayStr = new Date().toISOString().substring(0, 10);
-    const subject = encodeURIComponent(`[혈압 대시보드] 주간 데이터 백업 파일 (${todayStr})`);
-    const body = encodeURIComponent(`안녕하세요.\n\n혈압 기록 대시보드 백업 파일입니다.\n다운로드된 CSV 파일을 이 메일에 첨부하여 보관하세요.\n\n발송일: ${todayStr}`);
-
-    window.location.href = `mailto:${userEmail}?subject=${subject}&body=${body}`;
-  }
-
-  function importFromCSV(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const content = e.target.result;
-      const lines = content.split(/\r\n|\n/);
-      let importedCount = 0;
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        const cols = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
-        
-        if (cols.length >= 6) {
-          const date = cols[0].replace(/"/g, '').trim();
-          const time = cols[1].replace(/"/g, '').trim();
-          const sys = parseInt(cols[3].replace(/"/g, '').trim());
-          const dia = parseInt(cols[4].replace(/"/g, '').trim());
-          const pulse = parseInt(cols[5].replace(/"/g, '').trim());
-          const note = cols[6] ? cols[6].replace(/^"|"$/g, '').replace(/""/g, '"').trim() : '';
-
-          const hour = parseInt(time.split(':')[0]);
-          const period = (hour >= 4 && hour < 12) ? '아침' : '저녁';
-
-          const isDuplicate = bpData.some(d => d.date === date && d.time === time);
-
-          if (!isDuplicate && !isNaN(sys) && !isNaN(dia)) {
-            bpData.push({ id: String(Date.now() + Math.random()), date, time, sys, dia, pulse, note, period });
-            importedCount++;
-          }
-        }
-      }
-
-      if (importedCount > 0) {
-        sortData();
-        saveData();
-        renderApp();
-        alert(`${importedCount}건의 새로운 데이터를 불러왔습니다!`);
-      } else {
-        alert('새로 추가할 데이터가 없거나 CSV 형식이 맞지 않습니다.');
-      }
-      event.target.value = '';
-    };
-    reader.readAsText(file, 'UTF-8');
   }
 </script>
 </body>
